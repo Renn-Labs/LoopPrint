@@ -1,0 +1,12 @@
+{
+  "name": "loopprint",
+  "description": "Interactive wizard that turns a vague goal into a runnable loop blueprint — durable state, an external verifier, stop conditions, and maker != checker. Decision gate, pattern library, and a generated, self-linted artifact package.",
+  "author": {
+    "name": "Erik Ford",
+    "url": "https://github.com/Renn-Labs"
+  },
+  "homepage": "https://github.com/Renn-Labs/LoopPrint",
+  "repository": "https://github.com/Renn-Labs/LoopPrint",
+  "license": "MIT",
+  "keywords": ["loop", "agent", "automation", "verifier", "wizard", "skill", "claude-code"]
+}

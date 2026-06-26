@@ -1,0 +1,35 @@
+# gluerun-snippet.yaml — OPTIONAL heavy-orchestration layer.
+#
+# Only relevant if you run glueRun-go (L0/L1/L2 leases, state packets, gates/audits, git-worktree isolation,
+# detached dispatch, reconcile cycles) for long-running, cross-repo autonomy. For a normal single-repo loop you
+# do NOT need this — delete the file. The four atoms above already define the loop; this just maps them onto
+# glueRun's tiers.
+
+loop:
+  slug: <kebab-case-name>
+  goal: "<one-sentence goal>"
+
+  # L0 — supervisor: owns the goal, holds the lease, runs reconcile cycles until stop.
+  l0:
+    reconcile: actuate            # actuate | dry-run
+    lease_minutes: <int>          # auto-released by the reaper if the worker dies
+    stop:
+      success: "<composite verifier GREEN>"
+      max_cycles: <int>
+
+  # L1 — planner: decomposes the goal into worker tasks (a plan/judge-style planner + decider pair).
+  l1:
+    planner: <your-plan-agent>    # any planner/decomposer
+    emits: state_packet           # durable hand-off artifact between tiers
+
+  # L2 — workers: isolated executors, one git-worktree each (maker side only).
+  l2:
+    isolation: git-worktree
+    workers: <int>
+    task_source: l1.state_packet
+
+  # Audit / decider — the checker side. MUST be distinct from L2 workers (maker != checker).
+  audit:
+    verifier: "<external command or reviewer>"
+    decider: <your-judge-agent>   # accepts/rejects each worker result against the verifier
+    on_reject: requeue            # requeue | escalate

@@ -1,0 +1,22 @@
+%% LoopPrint — loop flow. Render at https://mermaid.live or any Mermaid-aware viewer.
+flowchart TD
+    G[Goal<br/><i>stated once</i>] --> GATE{Decision Gate<br/>4 conditions pass?}
+    GATE -- No --> ONE[Single high-quality pass<br/>or human-gated process]
+    GATE -- Yes --> INIT[Init State<br/>loops/&lt;slug&gt;/state.md]
+
+    INIT --> CHECK0{Verifier<br/>already GREEN?}
+    CHECK0 -- Yes --> DONE([DONE])
+    CHECK0 -- No --> MAKE[Maker: one change toward Goal]
+
+    MAKE --> VERIFY{External Verifier<br/>exit 0?}
+    VERIFY -- GREEN --> DONE
+    VERIFY -- RED --> LOGSTATE[Append result + hypothesis to State]
+
+    LOGSTATE --> STOP{Stop?<br/>max_iters / budget / HALT}
+    STOP -- hit limit --> ESCALATE([STOP: escalate / hand off])
+    STOP -- keep going --> MAKE
+
+    classDef done fill:#1b5e20,color:#fff,stroke:#1b5e20;
+    classDef halt fill:#7f1d1d,color:#fff,stroke:#7f1d1d;
+    class DONE done;
+    class ESCALATE,ONE halt;

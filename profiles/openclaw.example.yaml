@@ -1,0 +1,25 @@
+# ILLUSTRATIVE example profile for OpenClaw / EClaw.
+#
+# NOT maintained against OpenClaw releases. Copy this to ~/.loopprint/profile.yaml (or a project's
+# .loopprint/profile.yaml) and adjust the values to YOUR install. OpenClaw discovers folder-skills the
+# same way Claude does (~/.openclaw/skills/<name>/SKILL.md), so LoopPrint drops in unchanged — this
+# profile only tunes how generated loops are wired. See ../references/profiles.md.
+
+harness: openclaw
+
+# Where a loop's state + artifacts live in an OpenClaw project.
+state_dir: loops/<slug>
+
+# OpenClaw uses an AGENTS.md catalog; if your setup records a verifier verdict somewhere, point here.
+marker_path: ""
+
+verifier:
+  # An independent reviewer agent as the default gate (maker != checker), or a real command.
+  default: "an independent reviewer agent — or a test/build/lint/repro command"
+
+dispatch:
+  maker: "an OpenClaw skill/agent step"
+  checker: "a SEPARATE OpenClaw agent (must differ from the maker)"
+
+runner: run-this-loop.sh
+banner: ""

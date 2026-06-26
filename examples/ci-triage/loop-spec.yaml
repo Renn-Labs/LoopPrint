@@ -1,0 +1,36 @@
+slug: ci-triage
+created: 2026-06-24
+pattern: morty
+
+goal: >
+  The failing test(s) on the current branch pass, with no other test regressing.
+
+state:
+  path: loops/ci-triage/state.md
+  records:
+    - which test failed and the error
+    - the fix attempted this iteration
+    - verifier result
+    - next hypothesis
+
+verifier:
+  kind: test
+  command: "npm test --silent"          # exit 0 = full suite green
+  green_means: "the previously-failing test passes and nothing else regressed"
+
+stop:
+  success: "verifier GREEN (full suite passes)"
+  max_iterations: 6
+  budget:
+    tokens: null
+    wall_clock_minutes: 20
+  halt_file: loops/ci-triage/HALT
+
+autonomy: full                          # unattended on the branch; the human gate is "no push/merge" below
+human_checkpoints:
+  - "do not push or merge — fixes land on the branch for human review only"
+
+integrations:
+  oh_my_claudecode: true                # /loop drives the maker step
+  subagent_isolation: false
+  heavy_orchestrator: false

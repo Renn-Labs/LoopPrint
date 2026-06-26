@@ -1,0 +1,26 @@
+# ILLUSTRATIVE example profile for oh-my-claudecode (OMC).
+#
+# NOT maintained against OMC releases. Copy this to ~/.loopprint/profile.yaml (or your project's
+# .loopprint/profile.yaml) and adjust the values to YOUR installed version. LoopPrint does not track OMC's
+# conventions — you (or your OMC setup) own this binding. See ../references/profiles.md.
+
+harness: oh-my-claudecode
+
+# OMC keeps loop/session state under .omc/. Artifacts for a loop go in its own slug dir.
+state_dir: .omc/loops/<slug>
+
+# If your OMC harness enforces a verifier marker (e.g. a Stop hook that gates loop completion),
+# point at where it expects the verdict recorded. Leave "" if you don't run such a hook.
+marker_path: .omc/state/<mode>-verifier.json
+
+verifier:
+  # Prefer an independent reviewer agent as the default gate (maker != checker).
+  default: "oh-my-claudecode:code-reviewer (independent pass) — or a test/build/lint command"
+
+dispatch:
+  maker: "/loop + /goal, or an executor sub-agent"
+  checker: "oh-my-claudecode:verifier or :code-reviewer in a SEPARATE context"
+
+runner: run-this-loop.sh
+
+banner: "🔁 LOOP · <skill> · iter N/MAX · goal: <≤8 words> · verifier: GREEN|RED|—"

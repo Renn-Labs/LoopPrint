@@ -1,0 +1,14 @@
+{
+  "name": "renn-labs",
+  "owner": {
+    "name": "Renn Labs",
+    "url": "https://github.com/Renn-Labs"
+  },
+  "plugins": [
+    {
+      "name": "loopprint",
+      "source": "./",
+      "description": "Interactive wizard that turns a vague goal into a runnable loop blueprint (state, external verifier, stop conditions; maker != checker)."
+    }
+  ]
+}

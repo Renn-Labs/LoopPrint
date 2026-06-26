@@ -1,0 +1,26 @@
+# ILLUSTRATIVE example profile for Hermes.
+#
+# NOT maintained against Hermes releases. Copy this to ~/.loopprint/profile.yaml (or a project's
+# .loopprint/profile.yaml) and adjust to YOUR install. Hermes discovers folder-skills under
+# ~/.hermes/skills/<name>/SKILL.md (manage with `hermes skills`), and brings persistent state +
+# connectors that map naturally onto the loop's State and Verifier atoms. See ../references/profiles.md.
+
+harness: hermes
+
+# Hermes keeps durable state of its own (memories, kanban, sessions). Point the loop's State at the
+# Hermes-managed location your setup uses, or keep a per-loop dir.
+state_dir: loops/<slug>
+
+marker_path: ""
+
+verifier:
+  # A Hermes connector/tool that yields an objective signal (test/build/lint/repro), or a separate
+  # reviewer agent. Never the same agent self-grading.
+  default: "a Hermes tool/connector that runs a test/build/lint — or a SEPARATE reviewer agent"
+
+dispatch:
+  maker: "a Hermes agent run"
+  checker: "a SEPARATE Hermes agent or connector (maker != checker)"
+
+runner: run-this-loop.sh
+banner: ""

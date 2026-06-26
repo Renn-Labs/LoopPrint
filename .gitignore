@@ -1,0 +1,20 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Generated loop artifacts (the wizard writes these into the *consuming* repo, not here)
+loops/
+.loops/
+.omc/
+
+# Language tooling
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+*.log
