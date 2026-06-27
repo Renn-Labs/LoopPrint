@@ -56,17 +56,31 @@ git clone https://github.com/Renn-Labs/LoopPrint ~/loopprint
 ln -s ~/loopprint ~/.claude/skills/loopprint
 ```
 
-**Other harnesses (OpenCode, OpenClaw, Hermes, Codex, Grok, …):** LoopPrint is one portable skill, and many agents
-discover folder-skills the same way Claude does. Symlink it into that harness's skills directory:
+**Other harnesses.** LoopPrint is one self-contained folder skill (a `SKILL.md` plus `templates/` and `references/`
+that load on demand). To install, clone once (`git clone https://github.com/Renn-Labs/LoopPrint ~/loopprint`) and
+put it where your harness discovers skills:
+
+| Harness | Install | Notes |
+|-|-|-|
+| **[OpenCode](https://opencode.ai/docs/skills/)** | `ln -s ~/loopprint ~/.config/opencode/skills/loopprint` | Also natively discovers `~/.claude/skills/` — if you did the Claude folder install, it already works, no extra step. |
+| **[Pi](https://pi.dev/docs/latest/skills)** (minimalist coding harness) | `ln -s ~/loopprint .agents/skills/loopprint` (in your project, or any ancestor up to the git root) | Pi discovers a skill by its `SKILL.md` and is Claude-Code-compatible; also registrable via a `pi.skills` entry in `package.json`. |
+| **OpenClaw / EClaw** | `ln -s ~/loopprint ~/.openclaw/skills/loopprint` | |
+| **Hermes** | `ln -s ~/loopprint ~/.hermes/skills/loopprint` | then `hermes skills` to verify |
+| **Codex / OMX** | `cp -r ~/loopprint ~/.codex/skills/loopprint` | Codex *real-copies* skills rather than symlinking — re-copy after you update the clone. |
+| **grok build** | add an entry pointing at `~/loopprint/SKILL.md` to your `AGENTS.md` catalog | Grok reads an `AGENTS.md` index rather than scanning a skills dir. |
+
+The skill is dependency-free — nothing to `npm install` or `pip install` for the wizard itself.
+
+### Invoking the tools
+LoopPrint installs no `loopprint` binary on your `PATH` — by design (it's a skill, not a package). The helper
+scripts run from the clone; point `LOOPPRINT_ROOT` at it once and call them from anywhere:
 ```bash
-ln -s ~/loopprint ~/.config/opencode/skills/loopprint  # OpenCode (also auto-loads from ~/.claude/skills)
-ln -s ~/loopprint ~/.openclaw/skills/loopprint          # OpenClaw / EClaw
-ln -s ~/loopprint ~/.hermes/skills/loopprint            # Hermes (then `hermes skills` to verify)
+export LOOPPRINT_ROOT=~/loopprint
+python3 "$LOOPPRINT_ROOT/scripts/loopprint-ls.py"        # loop health / rot radar
+python3 "$LOOPPRINT_ROOT/scripts/loopprint-doctor.py"    # diagnose the install (prints the exact command for you)
 ```
-[OpenCode](https://opencode.ai/docs/skills/) natively discovers Agent Skills — including from `~/.claude/skills/` — so
-if you did the Claude folder install above, LoopPrint already works in OpenCode with no extra step. For harnesses that
-real-copy skills (Codex/OMX) or read an `AGENTS.md` catalog (Grok), register it the way that harness expects. The skill
-is self-contained; `templates/` and `references/` load on demand.
+Only `loopprint-lint.py` and profile parsing need PyYAML (`pip install pyyaml`); `ls` / `detect` / `report` are
+stdlib-only.
 
 ## Use
 
@@ -96,10 +110,11 @@ A self-contained, runnable package per loop:
 - `safety-checklist.md` — human checkpoints + budget limits
 - `flow.mmd` — a Mermaid diagram of the loop
 
-Plus tooling: `loopprint-lint.py` gates the spec, `loopprint-report.py` computes **cost-per-accepted-change** from
-`metrics.jsonl`, and `loopprint-skillify.py` promotes a GREEN loop into a reusable skill. Common verifier recipes
-live in [`templates/verifier-library.yaml`](templates/verifier-library.yaml); preflight a loop with
-`run-this-loop.sh --check`.
+Plus tooling: `loopprint-lint.py` gates the spec, `loopprint-ls.py` reports the health of every loop in the repo
+(**rot radar** — see [`references/rot-radar.md`](references/rot-radar.md)), `loopprint-report.py` computes
+**cost-per-accepted-change** from `metrics.jsonl`, and `loopprint-skillify.py` promotes a GREEN loop into a reusable
+skill. Common verifier recipes live in [`templates/verifier-library.yaml`](templates/verifier-library.yaml);
+preflight a loop with `run-this-loop.sh --check`.
 
 See [`templates/`](templates/) for the blanks and [`examples/`](examples/) for worked ones (ci-triage,
 spec-driven-remediation, perf-optimization, hybrid).

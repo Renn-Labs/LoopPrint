@@ -58,6 +58,9 @@ EXEC_SCRIPTS = [
     "scripts/loopprint-lint.py",
     "scripts/loopprint-detect.py",
     "scripts/loopprint-doctor.py",
+    "scripts/loopprint-ls.py",
+    "scripts/loopprint-report.py",
+    "scripts/loopprint-skillify.py",
     "scripts/banner.py",
 ]
 
@@ -423,6 +426,14 @@ def check_assets(r: Report) -> None:
               "Restore from a clean clone if you want the banner; nothing functional depends on it.")
 
 
+def check_invocation(r: Report) -> None:
+    # The tools ship with no installed `loopprint` binary by design — they run from this clone.
+    # Surface the canonical, copy-pasteable command so a user (and their CI) has a stable path.
+    if (ROOT / "scripts" / "loopprint-ls.py").is_file():
+        r.add("invocation", "INFO", "tools run from this clone (no PATH binary by design)",
+              f'loop health:  LOOPPRINT_ROOT="{ROOT}" python3 "$LOOPPRINT_ROOT/scripts/loopprint-ls.py"')
+
+
 CHECKS = [
     check_python,
     check_layout,
@@ -436,6 +447,7 @@ CHECKS = [
     check_skill_links,
     check_ecosystem_hint,
     check_assets,
+    check_invocation,
 ]
 
 

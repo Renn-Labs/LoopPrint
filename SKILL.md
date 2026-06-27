@@ -91,6 +91,8 @@ Create `loops/<slug>/` (slug = kebab-case of the goal) and write the package, fi
 After generation: preflight with `bash run-this-loop.sh --check`; once the loop has run, `loopprint-report.py
 loops/<slug>/metrics.jsonl` reports **cost-per-accepted-change**; `loopprint-skillify.py loops/<slug>` (Step 6
 "Save as skill") promotes a GREEN loop into a reusable skill. Pick a verifier from `templates/verifier-library.yaml`.
+To see the health of every loop in the repo at a glance (rot radar), run `loopprint-ls.py` — it flags loops that
+are ROTTEN (failing repeatedly) or STALE (stopped running); see [`references/rot-radar.md`](references/rot-radar.md).
 
 If a heavy orchestrator (e.g. glueRun-go) is in play, also emit `templates/gluerun-snippet.yaml` adapted.
 
