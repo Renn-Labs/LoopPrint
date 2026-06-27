@@ -2,7 +2,14 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+# One CI run per change: feature-branch pushes are covered by the pull_request event
+# (this repo requires PRs), and rapid re-pushes to a PR cancel their superseded runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
