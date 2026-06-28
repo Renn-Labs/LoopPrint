@@ -3,7 +3,7 @@
 Installs LoopPrint as a Windows directory junction.
 
 .DESCRIPTION
-Creates a no-admin mklink /J junction from this clone into a harness skills
+Creates a no-admin directory junction from this clone into a harness skills
 directory. The default target is the Claude Code folder-skill location:
 %USERPROFILE%\.claude\skills\loopprint.
 #>
@@ -14,6 +14,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version 2.0
 
 function Resolve-FullPath {
     param(
@@ -46,7 +47,8 @@ if ($env:OS -ne 'Windows_NT') {
     throw 'install-windows.ps1 only supports native Windows. Use ln -s on Linux, macOS, or WSL.'
 }
 
-if ($SkillName -match '[\\/]' -or [string]::IsNullOrWhiteSpace($SkillName)) {
+if ($SkillName -match '[\\/]' -or [string]::IsNullOrWhiteSpace($SkillName) -or
+    $SkillName.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0) {
     throw 'SkillName must be a single directory name, not a path.'
 }
 
@@ -67,9 +69,7 @@ if (-not (Test-Path -LiteralPath $skillsRoot -PathType Container)) {
 
 if (Test-Path -LiteralPath $installPath) {
     $item = Get-Item -LiteralPath $installPath -Force
-    $isJunction = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -and
-        $item.PSObject.Properties.Name -contains 'Target' -and
-        -not [string]::IsNullOrWhiteSpace([string] $item.Target)
+    $isJunction = $item.LinkType -eq 'Junction'
 
     if ($isJunction -and (Test-SamePath ([string] $item.Target) $repoRoot)) {
         Write-Host "LoopPrint is already installed:"
@@ -84,15 +84,16 @@ if (Test-Path -LiteralPath $installPath) {
     throw "Install path already exists and is not a junction: '$installPath'. Choose -SkillName or -SkillsDir, or move the existing directory."
 }
 
+$created = $false
 if ($PSCmdlet.ShouldProcess($installPath, "Create junction to $repoRoot")) {
-    $output = & cmd.exe /d /c "mklink /J `"$installPath`" `"$repoRoot`""
-    if ($LASTEXITCODE -ne 0) {
-        throw "mklink /J failed with exit code $LASTEXITCODE. Output: $output"
-    }
+    New-Item -ItemType Junction -Path $installPath -Value $repoRoot | Out-Null
+    $created = $true
 }
 
-Write-Host 'LoopPrint Windows install complete:'
-Write-Host "  clone:  $repoRoot"
-Write-Host "  skill:  $installPath"
-Write-Host ''
-Write-Host 'Verify in your harness by listing skills or invoking /loopprint.'
+if ($created) {
+    Write-Host 'LoopPrint Windows install complete:'
+    Write-Host "  clone:  $repoRoot"
+    Write-Host "  skill:  $installPath"
+    Write-Host ''
+    Write-Host 'Verify in your harness by listing skills or invoking /loopprint.'
+}
