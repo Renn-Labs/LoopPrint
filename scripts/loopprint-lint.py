@@ -14,6 +14,8 @@ Exit code:
 Requires PyYAML (`pip install pyyaml`).
 """
 from __future__ import annotations
+import hashlib
+import os
 import sys
 import re
 
@@ -137,6 +139,99 @@ def lint_spec(spec: dict) -> list[str]:
     return f
 
 
+def lint_loop_dir(spec_path: str, spec: dict) -> tuple[list[str], list[str]]:
+    """Return (blocking, advisory) findings for the loop directory containing spec_path.
+
+    Only active when verifier.shape == 'ratchet'. Gate specs are untouched (returns [], []).
+    Blocking findings cause RED. Advisory findings are informational only and do not affect exit code.
+    """
+    v = _as_dict(spec.get("verifier"))
+    shape = str(v.get("shape", "")).strip().lower()
+    if shape != "ratchet":
+        return [], []
+
+    d = os.path.dirname(os.path.abspath(spec_path))
+    blocking: list[str] = []
+    advisory: list[str] = []
+
+    # --- BLOCKING: required ratchet artifacts must exist on disk ---
+    baseline_path = os.path.join(d, "baseline")
+    advance_path = os.path.join(d, "ratchet-advance.sh")
+
+    if not os.path.isfile(baseline_path):
+        blocking.append(
+            "ratchet: no sibling 'baseline' file — commit a baseline so the gate is honest."
+        )
+    if not os.path.isfile(advance_path):
+        blocking.append(
+            "ratchet: no sibling 'ratchet-advance.sh' — ratchet needs an advance script."
+        )
+
+    # --- ADVISORY: verify.sh / maker.sh must not write the baseline ---
+    # Broad pattern: any write operator on the same line as 'baseline' or '$BASELINE'.
+    _WRITES_BASELINE = re.compile(
+        r'(?:>>?|tee|mv|cp|sed\s+-i)[^\n]*(?:baseline|\$BASELINE)',
+        re.IGNORECASE,
+    )
+    for name in ("verify.sh", "maker.sh"):
+        path = os.path.join(d, name)
+        if os.path.isfile(path):
+            try:
+                with open(path) as fh:
+                    content = fh.read()
+                if _WRITES_BASELINE.search(content):
+                    advisory.append(
+                        f"{name} may write baseline; only ratchet-advance.sh should "
+                        f"(maker/checker must not move the bar)."
+                    )
+            except OSError:
+                pass
+
+    # --- ADVISORY: duplicate scripts (same realpath or identical content hash) ---
+    def _sha256(path: str) -> str | None:
+        try:
+            with open(path, "rb") as fh:
+                return hashlib.sha256(fh.read()).hexdigest()
+        except OSError:
+            return None
+
+    all_scripts = ["verify.sh", "maker.sh", "ratchet-advance.sh"]
+    present = {n: os.path.join(d, n) for n in all_scripts if os.path.isfile(os.path.join(d, n))}
+    names = list(present)
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a, b = names[i], names[j]
+            same = False
+            try:
+                same = os.path.samefile(present[a], present[b])
+            except OSError:
+                pass
+            if not same:
+                ha, hb = _sha256(present[a]), _sha256(present[b])
+                if ha and hb and ha == hb:
+                    same = True
+            if same:
+                advisory.append(
+                    f"{a} and {b} are the same script; "
+                    f"maker != checker != advance must be distinct."
+                )
+
+    # --- ADVISORY: ratchet-advance.sh must not invoke an agent ---
+    _AGENT_TOKEN = re.compile(r'\b(?:claude|codex|llm|gpt|aider|cursor)\b', re.IGNORECASE)
+    if os.path.isfile(advance_path):
+        try:
+            with open(advance_path) as fh:
+                content = fh.read()
+            if _AGENT_TOKEN.search(content):
+                advisory.append(
+                    "ratchet-advance.sh must be deterministic, not an agent call."
+                )
+        except OSError:
+            pass
+
+    return blocking, advisory
+
+
 def main(argv: list[str]) -> int:
     paths = argv[1:]
     if not paths:
@@ -165,6 +260,8 @@ def main(argv: list[str]) -> int:
                                        "Each loop needs its own slug (and its own directory)."]
             else:
                 slugs[slug] = p
+        blocking, advisory = lint_loop_dir(p, spec)
+        findings = findings + blocking
         if findings:
             bad += 1
             print(f"RED  {p}:")
@@ -172,6 +269,8 @@ def main(argv: list[str]) -> int:
                 print(f"   - {x}")
         else:
             print(f"GREEN {p}: four atoms present, verifier is external, safety limit set.")
+        for w in advisory:
+            print(f"   ~ {w}")
     return 1 if bad else 0
 
 
