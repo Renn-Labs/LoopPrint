@@ -18,6 +18,7 @@ to prevent.
 ## Maker ≠ checker
 - [ ] The verifier is **external** and the reviewer (if any) is a **different** agent/process than the maker.
 - [ ] Each iteration logs a state change **and** a verifier result.
+- [ ] **Cross-provider (advisory)** — run `loopprint-detect.py` / `loopprint-doctor.py` to see `provider.available`; if 2+ agent CLIs are listed, point `dispatch.checker` at a different one than `dispatch.maker` (strongest maker≠checker). Not required: with one or zero providers, a deterministic gate (tests/lint) or the same CLI in a separate role is sufficient.
 
 ## Budget & cost
 - [ ] Token / wall-clock budget is set and you're willing to spend it.

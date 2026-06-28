@@ -88,6 +88,8 @@ Create `loops/<slug>/` (slug = kebab-case of the goal) and write the package, fi
 | `safety-checklist.md` | `templates/safety-checklist.md` | Human checkpoints + budget guardrails |
 | `flow.mmd` | `templates/flow.mmd` | Mermaid diagram of this loop |
 
+When filling `maker.sh` from `profile.dispatch.maker`, also record `profile.dispatch.checker` in the generated `safety-checklist.md` (under the Maker ≠ checker section) so the checker identity is explicit and the cross-provider option is visible. If `loopprint-detect.py` reports `provider.available` listing 2+ CLIs, note in the checklist that pointing `dispatch.checker` at a different provider than `dispatch.maker` gives the strongest maker≠checker isolation.
+
 After generation: preflight with `bash run-this-loop.sh --check`; once the loop has run, `loopprint-report.py
 loops/<slug>/metrics.jsonl` reports **cost-per-accepted-change**; `loopprint-skillify.py loops/<slug>` (Step 6
 "Save as skill") promotes a GREEN loop into a reusable skill. Pick a verifier from `templates/verifier-library.yaml`.

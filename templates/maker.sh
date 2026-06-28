@@ -20,6 +20,8 @@ GOAL="${GOAL:-<one-sentence goal>}"
 # per invocation so the verifier gates each step.
 #
 #   oh-my-claudecode:   claude -p "Make exactly one change toward: $GOAL. Then stop. Do not self-grade."
+#   codex:              codex exec "Make exactly one change toward: $GOAL. Then stop. Do not self-grade."
+#   grok:               grok "Make exactly one change toward: $GOAL. Then stop. Do not self-grade."
 #   sub-agent dispatch: your-dispatch --role executor --once --task "$GOAL"
 #   plain CLI / fixer:  your_tool --fix
 #
