@@ -91,3 +91,17 @@ is the **composite** — all sub-gates green.
 
 Across all four: the verifier is **external**, the state is **durable**, the stop has a **safety limit**, and the
 **maker never grades its own work**.
+
+## Verifier shape is a separate axis
+
+A pattern picks the *work*; it does **not** pick the verifier's *shape* or when the loop stops. Those are
+orthogonal — set them from the route, not the pattern:
+
+- **gate** — one-time pass/fail (the default: recurring, MORTY, spec-driven, performance against a fixed target).
+- **ratchet** — "no worse than a committed baseline", paired with a **budget** stop. For the persistent / Ralph
+  case: drive a metric with no terminal "done" (`verifier.shape: ratchet` + `stop.budget`).
+- **critic-panel** — k-of-N independent critics scoring against a rubric, judge ≠ maker. For subjective quality you
+  can *examine* (`verifier.kind: critic-panel` + `panel`).
+
+The [Decision Gate](decision-gate.md) routes a passing request to the archetype that sets these. Don't force every
+loop into the one-shot gate — and don't fold the verifier shape into the work pattern.
