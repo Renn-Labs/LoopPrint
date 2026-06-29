@@ -1,0 +1,40 @@
+slug: critic-panel
+created: 2026-06-28
+pattern: spec-driven
+
+goal: >
+  The draft README scores >= 80 on the rubric from >= 2 of 3 independent critics.
+
+state:
+  path: examples/critic-panel/state.md
+  records:
+    - critic scores this iteration
+    - quorum result (pass/fail, N passing critics)
+    - changes made to artifact this iteration
+    - next improvement to attempt
+
+verifier:
+  kind: critic-panel
+  command: "bash verify.sh"
+  green_means: "at least 2 of 3 critics score the artifact >= 80 on the rubric"
+  panel:
+    n: 3
+    quorum_k: 2
+    threshold: 80
+
+stop:
+  success: "verifier GREEN (quorum 2-of-3 critics score >= 80)"
+  max_iterations: 6
+  budget:
+    tokens: null
+    wall_clock_minutes: 30
+  halt_file: examples/critic-panel/HALT
+
+autonomy: full
+human_checkpoints:
+  - "do not push or merge — artifact improvements land on the branch for human review only"
+
+integrations:
+  oh_my_claudecode: true
+  subagent_isolation: true
+  heavy_orchestrator: false
