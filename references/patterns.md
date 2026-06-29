@@ -105,3 +105,7 @@ orthogonal — set them from the route, not the pattern:
 
 The [Decision Gate](decision-gate.md) routes a passing request to the archetype that sets these. Don't force every
 loop into the one-shot gate — and don't fold the verifier shape into the work pattern.
+
+> **Human approval is not a fourth shape.** It is either a *stop* (`autonomy: checkpoint`, for pausing at irreversible
+> steps) or the last-resort `human-vote` verifier (when no machine gate can encode the done-state) — see
+> [Human in the loop](verifiers.md#human-in-the-loop-two-distinct-roles-not-a-verifier-shape).
