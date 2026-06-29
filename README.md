@@ -172,6 +172,9 @@ prints an actionable fix for each problem. `--fix` only does safe, reversible re
 suggested, not done (maker ≠ checker). Full symptom→cause→fix map per install type in
 [`references/troubleshooting.md`](references/troubleshooting.md).
 
+When a single loop isn't enough, see [`references/campaign.md`](references/campaign.md) for
+the supervised multi-stage composition schema (`campaign-spec.yaml`) and worked example.
+
 ## Design principles
 
 - **The skill is the system.** LoopPrint encodes *components and gates*, not a personality. It does not demand a

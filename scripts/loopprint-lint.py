@@ -29,6 +29,7 @@ VALID_PATTERNS = {"morty", "spec-driven", "performance", "hybrid"}
 VALID_VERIFIER_SHAPES = {"gate", "ratchet"}
 SCHEMA_VERSION = 1  # highest loop-spec schema version this linter understands
 VALID_CHECKPOINT_MODES = {"before", "after"}
+VALID_STAGE_SUCCESS = {"gate", "ratchet"}
 
 # Phrases that mean "the maker graded its own work" — the defect LoopPrint exists to prevent.
 SELF_GRADE = re.compile(
@@ -382,6 +383,159 @@ def lint_loop_dir(spec_path: str, spec: dict) -> tuple[list[str], list[str]]:
     return blocking, advisory
 
 
+def lint_campaign_spec(spec_path: str, spec: dict) -> tuple:
+    """Validate a campaign-spec.yaml. Returns (blocking, advisory).
+
+    Called when kind=='campaign' OR a top-level 'stages' key is detected.
+    Never crashes on malformed input — returns a clean RED instead.
+    """
+    blocking: list[str] = []
+    advisory: list[str] = []
+
+    # kind must be "campaign"
+    kind = spec.get("kind")
+    if kind != "campaign":
+        blocking.append(
+            f"kind: must be 'campaign' (got {kind!r}) — use kind: campaign in campaign-spec.yaml."
+        )
+
+    # goal non-empty
+    goal = spec.get("goal")
+    if _is_blank(goal):
+        blocking.append("goal: missing or empty.")
+
+    # autonomy == checkpoint (enforced; a campaign without inter-stage checkpoints is a shell for-loop)
+    autonomy = spec.get("autonomy")
+    if autonomy != "checkpoint":
+        blocking.append(
+            f"autonomy: must be 'checkpoint' for a campaign (got {autonomy!r}); "
+            "a campaign without inter-stage checkpoints is a shell for-loop, not Autopilot."
+        )
+
+    # plan file must exist on disk
+    plan = spec.get("plan")
+    if _is_blank(plan):
+        blocking.append(
+            "plan: missing — campaigns require a human plan artifact (plan.md or similar)."
+        )
+    else:
+        spec_dir = os.path.dirname(os.path.abspath(spec_path))
+        plan_path = os.path.join(spec_dir, str(plan))
+        if not os.path.isfile(plan_path):
+            blocking.append(
+                f"plan: '{plan}' not found relative to this spec — create the campaign plan file."
+            )
+
+    # stages must be a non-empty list
+    stages = spec.get("stages")
+    if not isinstance(stages, list) or len(stages) == 0:
+        blocking.append("stages: must be a non-empty list of stage objects.")
+        return blocking, advisory  # can't validate individual stages further
+
+    spec_dir = os.path.dirname(os.path.abspath(spec_path))
+    seen_slugs: set = set()
+
+    for i, stage in enumerate(stages):
+        if not isinstance(stage, dict):
+            blocking.append(
+                f"stages[{i}]: must be a mapping, got {type(stage).__name__}."
+            )
+            continue
+        label = f"stages[{i}]"
+
+        slug = stage.get("slug")
+        stage_goal = stage.get("goal")
+        loop_dir = stage.get("loop_dir")
+        stage_success = stage.get("stage_success")
+
+        # slug
+        if _is_blank(slug):
+            blocking.append(f"{label}: 'slug' is missing or empty.")
+        else:
+            slug_str = str(slug)
+            if slug_str in seen_slugs:
+                blocking.append(
+                    f"{label}: slug '{slug_str}' is not unique within this campaign "
+                    "— each stage needs a distinct slug."
+                )
+            seen_slugs.add(slug_str)
+
+        # goal
+        if _is_blank(stage_goal):
+            blocking.append(f"{label}: 'goal' is missing or empty.")
+
+        # loop_dir — must resolve to a real leaf loop dir
+        if _is_blank(loop_dir):
+            blocking.append(f"{label}: 'loop_dir' is missing.")
+        else:
+            loop_path = os.path.join(spec_dir, str(loop_dir))
+            if not os.path.isdir(loop_path):
+                blocking.append(
+                    f"{label}: loop_dir '{loop_dir}' does not resolve to a directory "
+                    "— each stage must be a real leaf loop."
+                )
+            else:
+                if not os.path.isfile(os.path.join(loop_path, "loop-spec.yaml")):
+                    blocking.append(
+                        f"{label}: loop_dir '{loop_dir}' is missing loop-spec.yaml "
+                        "— each stage must be a real leaf loop."
+                    )
+                if not os.path.isfile(os.path.join(loop_path, "verify.sh")):
+                    blocking.append(
+                        f"{label}: loop_dir '{loop_dir}' is missing verify.sh "
+                        "— each stage must be a real leaf loop."
+                    )
+                # advisory: verifier.shape / stage_success mismatch
+                if (not _is_blank(stage_success)
+                        and stage_success in VALID_STAGE_SUCCESS):
+                    leaf_spec_path = os.path.join(loop_path, "loop-spec.yaml")
+                    try:
+                        with open(leaf_spec_path) as _fh:
+                            leaf = yaml.safe_load(_fh)
+                        if isinstance(leaf, dict):
+                            leaf_shape = str(
+                                _as_dict(leaf.get("verifier", {})).get("shape", "")
+                            ).strip().lower()
+                            if leaf_shape == "ratchet" and stage_success != "ratchet":
+                                advisory.append(
+                                    f"{label}: leaf loop '{loop_dir}' has verifier.shape: ratchet "
+                                    f"but stage_success is '{stage_success}' — consider "
+                                    f"stage_success: ratchet (OK on exit 2|6) for consistency."
+                                )
+                            elif leaf_shape == "gate" and stage_success == "ratchet":
+                                advisory.append(
+                                    f"{label}: leaf loop '{loop_dir}' has verifier.shape: gate "
+                                    f"but stage_success is 'ratchet' — gate loops exit 0 on success; "
+                                    f"consider stage_success: gate."
+                                )
+                    except Exception:
+                        pass  # never crash on a malformed leaf spec
+
+        # stage_success
+        if _is_blank(stage_success):
+            blocking.append(f"{label}: 'stage_success' is missing.")
+        elif stage_success not in VALID_STAGE_SUCCESS:
+            blocking.append(
+                f"{label}: stage_success '{stage_success}' must be one of "
+                f"{sorted(VALID_STAGE_SUCCESS)}."
+            )
+
+    # schema_version forward-compat advisory
+    sv = spec.get("schema_version")
+    if sv is not None:
+        try:
+            sv_int = int(sv)
+            if sv_int > SCHEMA_VERSION:
+                advisory.append(
+                    f"schema_version: {sv_int} is newer than this linter supports "
+                    f"({SCHEMA_VERSION}) — upgrade loopprint for full campaign validation."
+                )
+        except (TypeError, ValueError):
+            pass  # type errors on schema_version are informational only for campaigns
+
+    return blocking, advisory
+
+
 def main(argv: list[str]) -> int:
     paths = argv[1:]
     if not paths:
@@ -401,6 +555,20 @@ def main(argv: list[str]) -> int:
             print(f"RED  {p}: not a YAML mapping")
             bad += 1
             continue
+        # Route campaign specs before standard loop linting.
+        if spec.get("kind") == "campaign" or "stages" in spec:
+            cb, ca = lint_campaign_spec(p, spec)
+            if cb:
+                bad += 1
+                print(f"RED  {p}:")
+                for x in cb:
+                    print(f"   - {x}")
+            else:
+                print(f"GREEN {p}: campaign manifest valid — stages, plan, and autonomy present.")
+            for adv in ca:
+                print(f"   ~ {adv}")
+            continue
+
         findings = lint_spec(spec)
         # Slug uniqueness across the specs given in one run — two loops sharing a slug collide on loops/<slug>/.
         slug = spec.get("slug")
