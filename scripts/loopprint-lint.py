@@ -14,6 +14,8 @@ Exit code:
 Requires PyYAML (`pip install pyyaml`).
 """
 from __future__ import annotations
+import hashlib
+import os
 import sys
 import re
 
@@ -24,6 +26,7 @@ except ImportError:  # pragma: no cover
     sys.exit(2)
 
 VALID_PATTERNS = {"morty", "spec-driven", "performance", "hybrid"}
+VALID_VERIFIER_SHAPES = {"gate", "ratchet"}
 SCHEMA_VERSION = 1  # highest loop-spec schema version this linter understands
 VALID_CHECKPOINT_MODES = {"before", "after"}
 
@@ -110,6 +113,25 @@ def lint_spec(spec: dict) -> list[str]:
             f.append(f"{label}: looks like self-grading ('{val[:50]}'). "
                      "The maker cannot be the checker — point this at an external gate.")
 
+    # critic-panel quorum config validation (only when kind == "critic-panel").
+    if v.get("kind") == "critic-panel":
+        panel = _as_dict(v.get("panel"))
+        n = panel.get("n")
+        qk = panel.get("quorum_k")
+        thr = panel.get("threshold")
+        n_ok = isinstance(n, int) and not isinstance(n, bool) and n > 0
+        if not n_ok:
+            f.append("verifier.panel.n: must be a positive integer (required for kind: critic-panel).")
+        else:
+            qk_ok = isinstance(qk, int) and not isinstance(qk, bool) and qk > 0
+            if not qk_ok:
+                f.append("verifier.panel.quorum_k: must be a positive integer (required for kind: critic-panel).")
+            elif qk > n:
+                f.append(f"verifier.panel.quorum_k: {qk} > panel.n ({n}) — quorum cannot exceed the number of critics.")
+        if thr is not None:
+            if not (isinstance(thr, int) and not isinstance(thr, bool) and 0 <= thr <= 100):
+                f.append(f"verifier.panel.threshold: '{thr}' must be an integer 0–100.")
+
     # Stop — must have a safety limit (max_iterations or a budget), not just a success condition.
     stop = _as_dict(spec.get("stop"))
     mi = stop.get("max_iterations")
@@ -124,7 +146,240 @@ def lint_spec(spec: dict) -> list[str]:
     if mi is not None and not mi_ok:
         f.append(f"stop.max_iterations: '{mi}' is not a positive integer.")
 
+    # Verifier shape — optional; must be a known archetype if given.
+    shape = v.get("shape")
+    if shape is not None:
+        if str(shape).strip().lower() not in VALID_VERIFIER_SHAPES:
+            f.append(f"verifier.shape: '{shape}' must be one of {sorted(VALID_VERIFIER_SHAPES)}.")
+        elif str(shape).strip().lower() == "ratchet" and not has_budget:
+            f.append("verifier.shape: ratchet has no finish gate — set stop.budget "
+                     "(a ratchet runs until budget, not until GREEN).")
+
     return f
+
+
+_EXEC_MAKER_RE = re.compile(
+    r"(bash\s+maker\.sh|exec\s+\S*maker\.sh|source\s+maker\.sh|\.\s+maker\.sh)"
+)
+_PROV_RE = re.compile(r"PROVIDER\s*=\s*['\"]?(\w+)['\"]?")
+_AGENT_RE = re.compile(r"\b(claude|codex|grok|gemini|aider|cursor-agent)\b")
+
+
+def _sha256(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _provider_tokens(path: str) -> set:
+    try:
+        txt = open(path).read()
+    except OSError:
+        return set()
+    toks = {m.group(1).lower() for m in _PROV_RE.finditer(txt)}
+    toks |= {m.group(1).lower() for m in _AGENT_RE.finditer(txt)}
+    return toks
+
+
+def lint_critic_panel_dir(spec_path: str, spec: dict) -> tuple:
+    """Check filesystem judge≠maker integrity for critic-panel specs.
+
+    Returns (blocking, advisory) — both empty if verifier.kind != 'critic-panel'.
+    blocking entries are added to findings (RED); advisory are printed as '   ~ <msg>'
+    without affecting exit code.
+    """
+    v = _as_dict(spec.get("verifier"))
+    if v.get("kind") != "critic-panel":
+        return [], []
+
+    panel = _as_dict(v.get("panel"))
+    n = panel.get("n")
+    n_ok = isinstance(n, int) and not isinstance(n, bool) and n > 0
+
+    blocking: list = []
+    advisory: list = []
+
+    d = os.path.dirname(os.path.abspath(spec_path))
+
+    # Discover critic scripts (sorted, basenames only).
+    try:
+        critic_names = sorted(
+            f for f in os.listdir(d) if re.match(r"critic-.*\.sh$", f)
+        )
+    except OSError:
+        critic_names = []
+
+    # BLOCKING: fewer than panel.n critics present (skip if n invalid — S2 already flags it).
+    if n_ok and len(critic_names) < n:
+        blocking.append(
+            f"critic-panel: found {len(critic_names)} critic-*.sh but panel.n={n} "
+            f"— need {n} distinct critic scripts."
+        )
+
+    maker_path = os.path.join(d, "maker.sh")
+    maker_exists = os.path.isfile(maker_path)
+    maker_realpath = os.path.realpath(maker_path) if maker_exists else None
+    try:
+        maker_sha = _sha256(maker_path) if maker_exists else None
+    except OSError:
+        maker_sha = None
+    maker_providers = _provider_tokens(maker_path) if maker_exists else set()
+
+    seen_shas: dict = {}  # sha -> first critic basename (identical-critics check)
+
+    for name in critic_names:
+        path = os.path.join(d, name)
+        is_maker_violation = False
+
+        # Compute sha once per critic.
+        try:
+            sha = _sha256(path)
+        except OSError:
+            sha = None
+
+        if maker_exists:
+            # BLOCKING: realpath == maker.sh (symlink alias).
+            if os.path.realpath(path) == maker_realpath:
+                blocking.append(
+                    f"{name} is/runs maker.sh — maker cannot be its own checker."
+                )
+                is_maker_violation = True
+            # BLOCKING: content sha == maker.sh.
+            elif sha and sha == maker_sha:
+                blocking.append(
+                    f"{name} is/runs maker.sh — maker cannot be its own checker."
+                )
+                is_maker_violation = True
+            else:
+                # BLOCKING: script calls/execs/sources maker.sh.
+                try:
+                    content = open(path).read()
+                except OSError:
+                    content = ""
+                if _EXEC_MAKER_RE.search(content):
+                    blocking.append(
+                        f"{name} is/runs maker.sh — maker cannot be its own checker."
+                    )
+                    is_maker_violation = True
+
+        # BLOCKING: two critics identical (only for non-maker-violation critics).
+        if not is_maker_violation and sha:
+            if sha in seen_shas:
+                blocking.append(
+                    f"{seen_shas[sha]} and {name} are identical "
+                    f"— critics must be independent."
+                )
+            else:
+                seen_shas[sha] = name
+
+        # ADVISORY: critic shares provider with maker (skip if already a maker violation).
+        if not is_maker_violation and maker_exists and maker_providers:
+            cp = _provider_tokens(path)
+            common = cp & maker_providers
+            if common:
+                prov_str = ", ".join(sorted(common))
+                advisory.append(
+                    f"{name} uses the same provider as maker.sh "
+                    f"({prov_str} — single-provider panel — weaker independence; "
+                    f"point a critic at a different provider via dispatch.checker if available)."
+                )
+
+    return blocking, advisory
+
+
+def lint_loop_dir(spec_path: str, spec: dict) -> tuple[list[str], list[str]]:
+    """Return (blocking, advisory) findings for the loop directory containing spec_path.
+
+    Only active when verifier.shape == 'ratchet'. Gate specs are untouched (returns [], []).
+    Blocking findings cause RED. Advisory findings are informational only and do not affect exit code.
+    """
+    v = _as_dict(spec.get("verifier"))
+    shape = str(v.get("shape", "")).strip().lower()
+    if shape != "ratchet":
+        return [], []
+
+    d = os.path.dirname(os.path.abspath(spec_path))
+    blocking: list[str] = []
+    advisory: list[str] = []
+
+    # --- BLOCKING: required ratchet artifacts must exist on disk ---
+    baseline_path = os.path.join(d, "baseline")
+    advance_path = os.path.join(d, "ratchet-advance.sh")
+
+    if not os.path.isfile(baseline_path):
+        blocking.append(
+            "ratchet: no sibling 'baseline' file — commit a baseline so the gate is honest."
+        )
+    if not os.path.isfile(advance_path):
+        blocking.append(
+            "ratchet: no sibling 'ratchet-advance.sh' — ratchet needs an advance script."
+        )
+
+    # --- ADVISORY: verify.sh / maker.sh must not write the baseline ---
+    # Broad pattern: any write operator on the same line as 'baseline' or '$BASELINE'.
+    _WRITES_BASELINE = re.compile(
+        r'(?:>>?|tee|mv|cp|sed\s+-i)[^\n]*(?:baseline|\$BASELINE)',
+        re.IGNORECASE,
+    )
+    for name in ("verify.sh", "maker.sh"):
+        path = os.path.join(d, name)
+        if os.path.isfile(path):
+            try:
+                with open(path) as fh:
+                    content = fh.read()
+                if _WRITES_BASELINE.search(content):
+                    advisory.append(
+                        f"{name} may write baseline; only ratchet-advance.sh should "
+                        f"(maker/checker must not move the bar)."
+                    )
+            except OSError:
+                pass
+
+    # --- ADVISORY: duplicate scripts (same realpath or identical content hash) ---
+    def _sha256(path: str) -> str | None:
+        try:
+            with open(path, "rb") as fh:
+                return hashlib.sha256(fh.read()).hexdigest()
+        except OSError:
+            return None
+
+    all_scripts = ["verify.sh", "maker.sh", "ratchet-advance.sh"]
+    present = {n: os.path.join(d, n) for n in all_scripts if os.path.isfile(os.path.join(d, n))}
+    names = list(present)
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a, b = names[i], names[j]
+            same = False
+            try:
+                same = os.path.samefile(present[a], present[b])
+            except OSError:
+                pass
+            if not same:
+                ha, hb = _sha256(present[a]), _sha256(present[b])
+                if ha and hb and ha == hb:
+                    same = True
+            if same:
+                advisory.append(
+                    f"{a} and {b} are the same script; "
+                    f"maker != checker != advance must be distinct."
+                )
+
+    # --- ADVISORY: ratchet-advance.sh must not invoke an agent ---
+    _AGENT_TOKEN = re.compile(r'\b(?:claude|codex|llm|gpt|aider|cursor)\b', re.IGNORECASE)
+    if os.path.isfile(advance_path):
+        try:
+            with open(advance_path) as fh:
+                content = fh.read()
+            if _AGENT_TOKEN.search(content):
+                advisory.append(
+                    "ratchet-advance.sh must be deterministic, not an agent call."
+                )
+        except OSError:
+            pass
+
+    return blocking, advisory
 
 
 def main(argv: list[str]) -> int:
@@ -155,6 +410,10 @@ def main(argv: list[str]) -> int:
                                        "Each loop needs its own slug (and its own directory)."]
             else:
                 slugs[slug] = p
+        # Dir-level integrity: ratchet baseline wiring + critic-panel judge≠maker (advisory is non-failing).
+        lb, la = lint_loop_dir(p, spec)
+        cb, ca = lint_critic_panel_dir(p, spec)
+        findings += lb + cb
         if findings:
             bad += 1
             print(f"RED  {p}:")
@@ -162,6 +421,8 @@ def main(argv: list[str]) -> int:
                 print(f"   - {x}")
         else:
             print(f"GREEN {p}: four atoms present, verifier is external, safety limit set.")
+        for adv in la + ca:
+            print(f"   ~ {adv}")
     return 1 if bad else 0
 
 

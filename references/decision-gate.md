@@ -36,11 +36,47 @@ Answer fast. Any "no" in 1–4 is a hard stop; the rest shape the design.
 
 ## Verdict
 
-- **Pass (1–4 all yes):** proceed to design. Note any unchecked safety items as required artifacts.
-- **Fail (any of 1–4 no):** recommend the honest alternative and stop:
+- **Pass (1–4 all yes):** you have a loop. Don't force it into the one-shot gate — **route** it (below) to the
+  archetype whose *verifier* and *stop* shape actually fit. Note any unchecked safety items as required artifacts.
+- **Fail (any of 1–4 no):** the gate **rejects** — recommend the honest alternative and stop. This is the most
+  valuable thing LoopPrint does; routing never overrides it.
   - Not recurring / retries costly → **one high-quality pass**.
-  - No objective gate → **human-reviewed task**, not an autonomous loop.
-  - Irreversible + judgment-heavy (prod deploy, auth, payments, "is this good enough") → **human-gated process**.
+  - No objective gate of *any* shape (not a test, not a ratchet baseline, not a rubric + independent critics, not
+    even a human checkpoint) → **human-reviewed task**, not an autonomous loop.
+  - Irreversible + judgment-heavy (prod deploy, auth, payments) → **human-gated process**.
+
+## Route (only after a Pass) — pick the archetype, don't force one shape
+
+Passing Tier-0 means a loop is justified; it does **not** mean "a one-time test gate." Classify by *what kind of
+wrong you're correcting* and *how "done" is defined*, then route to the matching profile. The verifier and stop
+shapes differ per archetype — that's the whole point.
+
+| The request is… | Archetype | Verifier shape | Stop shape | loop-spec profile |
+|-|-|-|-|-|
+| A recurring regression to keep fixed (CI triage, dep bumps, lint/format) | **Recurring** | one-time **gate** (test/build/lint) | finish-gate | `pattern` by work · gate verifier · `max_iterations` |
+| A specific, reproducible bug | **MORTY / debug** | reproduction test (gate) | finish-gate | `pattern: morty` |
+| Conform to a (maybe reverse-engineered) spec | **Spec-Driven** | derived test suite (gate) | finish-gate | `pattern: spec-driven` |
+| Drive a metric with **no terminal "done"** (perf, debt, coverage, dep-freshness) | **Persistent / Ralph** | **ratchet** — "no worse than a committed baseline" | **budget** (wall-clock / max-iters) | `pattern: performance` · `verifier.shape: ratchet` · `stop.budget` |
+| Judge subjective quality you **can express as a rubric** (docs, answers, design) | **Critic-panel (Eval)** | **k-of-N independent critics** vs a rubric (judge ≠ maker) | finish-gate (quorum met) | `verifier.kind: critic-panel` · `panel: {n, quorum_k, threshold}` |
+| Coordinate multi-agent output, judged by critics | **Orchestration** | critic-panel over the coordinated result | finish-gate | `verifier.kind: critic-panel` |
+| A multi-stage campaign a human **supervises at checkpoints** (agent runs between them) | **Supervised / Autopilot** | per-stage gate **+ human checkpoint** | finish-gate / budget | `autonomy: checkpoint` |
+
+*(`verifier.shape: ratchet` ships with the ratchet/persistent vertical; `verifier.kind: critic-panel` with the
+critic-panel vertical. Route to the archetype; its profile fields come with it.)*
+
+### Routing expands the Pass set — without lowering the bar
+The archetypes are exactly what let the gate **route instead of reject** for cases the one-shape gate used to turn
+away:
+- **"Drive it down forever"** (no terminal done) used to fail cond. 2's "clear done" — now it's a **ratchet** with
+  a **budget** stop. The gate is still external (count/metric ≤ baseline), just non-terminal.
+- **"Is this any good?"** used to fail cond. 2 — but only when it's *unexaminable*. If you can write a **rubric**
+  and point **independent critics** at it, that IS an objective gate → **critic-panel**. No rubric, no critics →
+  still rejected.
+- **"A human watches this"** used to fail cond. 4 — but cond. 4 only rejects *human-every-step*. A campaign the
+  agent runs **between** human checkpoints passes → **autonomy: checkpoint**.
+
+The bar is unchanged: there must still be an external, maker≠checker gate of *some* shape. Routing picks the right
+shape **once the bar is met** — it never waves a task through that has no gate at all.
 
 ## The metric
 
@@ -54,5 +90,7 @@ lands accepted changes hands-off can still win; one that loops cheaply forever w
 | CI failure triage | Architecture rewrites |
 | Dependency bumps | Auth / payments changes |
 | Lint / format auto-fix | Production deploys |
-| Flaky-test reproduction | Judgment-call "is this good?" |
+| Flaky-test reproduction | Judgment-call "is this good?" *with no rubric you can write* |
 | Issue → PR on well-tested code | Anything irreversible without a human gate |
+| Drive coverage/debt to a floor (ratchet) | Drive a metric you can't measure |
+| Quality you can rubric + have critics judge (critic-panel) | Quality only the maker can "feel" |

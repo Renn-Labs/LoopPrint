@@ -44,10 +44,13 @@ Steps 3 & 5. If nothing resolves, use generic defaults (`loops/<slug>/`, `verify
 with no harness. Contract: [`references/profiles.md`](references/profiles.md). Never hardcode a harness's
 conventions here — always read them from the binding.
 
-### Step 1 — Decision Gate
+### Step 1 — Decision Gate (+ route)
 Run the Tier-0 test in [`references/decision-gate.md`](references/decision-gate.md): the 4 conditions + the
 30-second checklist. Report **Pass** or **Fail** with one line of reasoning per condition. On Fail, recommend the
 honest alternative (single high-quality pass, or a human-gated process) and **stop unless the user overrides**.
+On **Pass**, **route** with the table in that file: classify by *what kind of wrong you're correcting* and *how
+"done" is defined*, and name the archetype + its profile (verifier shape/kind, stop shape, autonomy). The route —
+not a default — drives Step 4. Routing never overrides a Fail; it only picks the shape once the bar is met.
 
 ### Step 2 — Goal Refinement
 Ask **3–5 targeted questions** (not more). Cover:
@@ -67,12 +70,20 @@ Force a concrete value for each atom. Do not proceed with any left vague:
 - **Stop** — success criteria **and** a safety limit (max iterations, token/time budget, explicit halt). First to
   hit wins. No loop ships without a safety limit.
 
-### Step 4 — Pattern Selection
-Recommend one pattern from [`references/patterns.md`](references/patterns.md) and explain the choice in 1–2 lines:
-- **MORTY** — a specific bug to fix. Verifier = a reproduction test.
-- **Spec-Driven Remediation** — bring a system up to a (possibly reverse-engineered) spec. Verifier = derived tests.
-- **Performance Optimization** — make something faster/cheaper. Verifier = benchmark target + no regressions.
+### Step 4 — Profile Selection (pattern + verifier/stop shape)
+The Step-1 route already chose the **archetype**; here you pin its full profile — the **work pattern** from
+[`references/patterns.md`](references/patterns.md) AND the verifier/stop shape the route indicated:
+- **MORTY** — a specific bug. `pattern: morty`; verifier = reproduction test (gate); finish-gate.
+- **Spec-Driven** — conform to a (maybe reverse-engineered) spec. `pattern: spec-driven`; derived tests (gate).
+- **Performance** — faster/cheaper for a fixed target (gate), OR drive a metric with **no terminal "done"** →
+  `pattern: performance` + **`verifier.shape: ratchet` + `stop.budget`** (the persistent / Ralph case).
 - **Hybrid** — real work mixing the above. Verifier = composite gate.
+- **Critic-panel** (Eval / Orchestration) — judge rubric-able quality with k-of-N independent critics:
+  `verifier.kind: critic-panel` + `panel: {n, quorum_k, threshold}` (judge ≠ maker; cross-provider strongest).
+- **Supervised** — a campaign with human checkpoints: `autonomy: checkpoint` (the agent runs between gates).
+
+Pattern = the *work*; verifier shape/kind + stop + autonomy = *how it's gated and when it stops* — orthogonal axes.
+Set **both** from the route, not a single default.
 
 ### Step 5 — Artifact Generation
 Create `loops/<slug>/` (slug = kebab-case of the goal) and write the package, filling the
@@ -87,6 +98,8 @@ Create `loops/<slug>/` (slug = kebab-case of the goal) and write the package, fi
 | `run-this-loop.sh` | `templates/run-this-loop.sh` | Engine-agnostic runner; emits `metrics.jsonl` + `state.jsonl` each iteration |
 | `safety-checklist.md` | `templates/safety-checklist.md` | Human checkpoints + budget guardrails |
 | `flow.mmd` | `templates/flow.mmd` | Mermaid diagram of this loop |
+
+When filling `maker.sh` from `profile.dispatch.maker`, also record `profile.dispatch.checker` in the generated `safety-checklist.md` (under the Maker ≠ checker section) so the checker identity is explicit and the cross-provider option is visible. If `loopprint-detect.py` reports `provider.available` listing 2+ CLIs, note in the checklist that pointing `dispatch.checker` at a different provider than `dispatch.maker` gives the strongest maker≠checker isolation.
 
 After generation: preflight with `bash run-this-loop.sh --check`; once the loop has run, `loopprint-report.py
 loops/<slug>/metrics.jsonl` reports **cost-per-accepted-change**; `loopprint-skillify.py loops/<slug>` (Step 6

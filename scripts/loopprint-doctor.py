@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -467,11 +468,90 @@ def check_ecosystem_hint(r: Report) -> None:
         r.add("ecosystem", "INFO", f"detected: {', '.join(seen)}",
               "Harnesses that discover a skills dir (OpenClaw, Hermes, OpenCode) install like Claude — symlink "
               "the repo into that skills dir (OpenCode also auto-loads skills from ~/.claude/skills). For "
-              "harnesses that real-copy skills (Codex/OMX) or read an AGENTS.md catalog (Grok), re-run that "
+              "harnesses that real-copy skills (Codex/OMX) or read an AGENTS.md catalog, re-run that "
               "harness's sync after updates. These bridges are owned by your harness; see "
               "references/troubleshooting.md.")
     else:
         r.add("ecosystem", "INFO", "no known harness markers — generic install")
+
+
+PROVIDERS = [
+    ("claude", "claude"),
+    ("codex", "codex"),
+    ("grok", "grok"),
+    ("gemini", "gemini"),
+    ("aider", "aider"),
+    ("cursor-agent", "cursor-agent"),
+]
+
+
+def check_available_providers(r: Report) -> None:
+    available = [label for label, binary in PROVIDERS if shutil.which(binary) is not None]
+    if available:
+        detail = (f"{', '.join(available)} detected — wire a different one as the checker "
+                  "for cross-provider maker≠checker")
+    else:
+        detail = "none detected — loops run on deterministic gates or your single tool"
+    r.add("available_providers", "INFO", detail)
+
+
+def check_ratchet_wiring(r: Report) -> None:
+    """For each examples/*/loop-spec.yaml with verifier.shape == ratchet, verify that a
+    sibling run_demo.sh exists and contains VERIFIER_SHAPE=ratchet — catching silent gate-drift
+    where the spec declares ratchet but the demo runner is not wired to use the ratchet shape."""
+    try:
+        import yaml
+    except ImportError:
+        r.add("ratchet_wiring", "SKIP", "PyYAML not installed — cannot read loop specs")
+        return
+
+    examples_dir = ROOT / "examples"
+    if not examples_dir.is_dir():
+        r.add("ratchet_wiring", "SKIP", "examples/ directory not found")
+        return
+
+    checked = 0
+    warnings: list[str] = []
+    for spec_path in sorted(examples_dir.glob("*/loop-spec.yaml")):
+        try:
+            spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(spec, dict):
+            continue
+        v = spec.get("verifier")
+        if not isinstance(v, dict):
+            v = {}
+        shape = str(v.get("shape", "")).strip().lower()
+        if shape != "ratchet":
+            continue
+        checked += 1
+        slug = spec.get("slug", spec_path.parent.name)
+        demo = spec_path.parent / "run_demo.sh"
+        if not demo.is_file():
+            warnings.append(f"{slug}: run_demo.sh missing")
+            continue
+        try:
+            content = demo.read_text(encoding="utf-8")
+        except OSError:
+            warnings.append(f"{slug}: run_demo.sh unreadable")
+            continue
+        if "VERIFIER_SHAPE=ratchet" not in content:
+            warnings.append(
+                f"{slug}: run_demo.sh does not export VERIFIER_SHAPE=ratchet "
+                "(spec says ratchet but the runner is not wired for it)"
+            )
+
+    if not checked:
+        r.add("ratchet_wiring", "SKIP", "no ratchet loop-spec.yaml found in examples/")
+        return
+    if warnings:
+        r.add("ratchet_wiring", "WARN",
+              "; ".join(warnings),
+              "Add VERIFIER_SHAPE=ratchet to run_demo.sh so the runner uses the ratchet shape.")
+    else:
+        r.add("ratchet_wiring", "OK",
+              f"all {checked} ratchet loop(s) have run_demo.sh wired with VERIFIER_SHAPE=ratchet")
 
 
 def check_assets(r: Report) -> None:
@@ -508,6 +588,8 @@ CHECKS = [
     check_skill_links,
     check_dual_registration,
     check_ecosystem_hint,
+    check_available_providers,
+    check_ratchet_wiring,
     check_assets,
     check_invocation,
 ]
