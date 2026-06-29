@@ -1,0 +1,27 @@
+slug: campaign-remedi-stage-1
+created: 2026-06-28
+pattern: spec-driven
+
+goal: >
+  Derive and commit a machine-checkable spec for the target module,
+  verified by the presence of the generated spec.md artifact.
+
+state:
+  path: examples/campaign-staged-remediation/stage-1/state.md
+  records:
+    - spec.md present or absent
+    - verifier result (GREEN / RED)
+    - next action
+
+verifier:
+  shape: gate
+  command: "bash verify.sh"
+  green_means: >
+    spec.md exists in the working directory — the reverse-engineered spec
+    has been written and is ready for the human checkpoint review.
+
+stop:
+  max_iterations: 10
+  halt_file: examples/campaign-staged-remediation/stage-1/HALT
+
+autonomy: full

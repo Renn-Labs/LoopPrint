@@ -133,7 +133,9 @@ Plus tooling: `loopprint-lint.py` gates the spec, `loopprint-ls.py` reports the 
 (**rot radar** — see [`references/rot-radar.md`](references/rot-radar.md)), `loopprint-report.py` computes
 **cost-per-accepted-change** from `metrics.jsonl`, and `loopprint-skillify.py` promotes a GREEN loop into a reusable
 skill. Common verifier recipes live in [`templates/verifier-library.yaml`](templates/verifier-library.yaml);
-preflight a loop with `run-this-loop.sh --check`.
+preflight a loop with `run-this-loop.sh --check`. The artifact contract (loop-spec, campaign-spec,
+verifier-library) is published and versioned in [`references/schema.md`](references/schema.md) — the linter is the
+executable schema.
 
 See [`templates/`](templates/) for the blanks and [`examples/`](examples/) for worked ones (ci-triage,
 spec-driven-remediation, perf-optimization, hybrid).
@@ -171,6 +173,9 @@ It walks the install bottom-up — files intact → scripts runnable → binding
 prints an actionable fix for each problem. `--fix` only does safe, reversible repairs; anything riskier is
 suggested, not done (maker ≠ checker). Full symptom→cause→fix map per install type in
 [`references/troubleshooting.md`](references/troubleshooting.md).
+
+When a single loop isn't enough, see [`references/campaign.md`](references/campaign.md) for
+the supervised multi-stage composition schema (`campaign-spec.yaml`) and worked example.
 
 ## Design principles
 

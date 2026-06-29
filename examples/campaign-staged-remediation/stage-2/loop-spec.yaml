@@ -1,0 +1,27 @@
+slug: campaign-remedi-stage-2
+created: 2026-06-28
+pattern: spec-driven
+
+goal: >
+  Remediate all findings produced by the spec-derived test suite,
+  verified by the presence of the remediated.flag sentinel.
+
+state:
+  path: examples/campaign-staged-remediation/stage-2/state.md
+  records:
+    - remediated.flag present or absent
+    - verifier result (GREEN / RED)
+    - finding addressed this iteration
+
+verifier:
+  shape: gate
+  command: "bash verify.sh"
+  green_means: >
+    remediated.flag exists — all spec-driven findings have been addressed
+    and the production code conforms to the spec derived in stage 1.
+
+stop:
+  max_iterations: 10
+  halt_file: examples/campaign-staged-remediation/stage-2/HALT
+
+autonomy: full

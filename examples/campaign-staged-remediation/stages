@@ -1,0 +1,6 @@
+# stages — YAML-blind artifact read by the orchestrator (when built).
+# One loop_dir per line. Lines starting with # are comments.
+# The orchestrator never reads campaign-spec.yaml; it reads this file
+# and interprets each stage's process EXIT CODE + state files only.
+stage-1
+stage-2

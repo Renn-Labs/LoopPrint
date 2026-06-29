@@ -88,7 +88,7 @@ recipes:
 
   - id: human-vote
     kind: human
-    use_when: A named human must approve before the loop may report GREEN (irreversible or judgment-heavy work).
+    use_when: No machine gate can encode the done-state — a named human is the verifier of LAST RESORT (judgment-heavy work with no automatable check). For routine pause-at-an-irreversible-step work, use the `checkpoint` autonomy mode plus `human_checkpoints` instead — that is a stop-shape, not a verifier.
     snippet: |
       set -euo pipefail
       VOTE_FILE="loops/<slug>/human-approval"
@@ -102,7 +102,7 @@ recipes:
       fi
       echo "verify: human-vote GREEN"
     green_means: A human reviewer explicitly recorded APPROVED in the vote file.
-    caveats: This makes the loop a checkpointed workflow, not a fully autonomous loop — the runner blocks until a human acts. The human is external by definition (maker ≠ checker), but throughput depends on human availability.
+    caveats: This makes the loop a checkpointed workflow, not a fully autonomous loop — the runner blocks until a human acts. The human is external by definition (maker ≠ checker), but throughput depends on human availability. This is distinct from a human *checkpoint* (the `checkpoint` autonomy mode) — a checkpoint pauses a loop that ALREADY has a machine verifier, whereas human-vote IS the verifier because none exists. If any part of the goal can be machine-checked, gate that and put the human on a checkpoint.
 
   - id: critic-panel
     kind: rubric

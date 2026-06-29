@@ -1,0 +1,39 @@
+# campaign-spec.yaml — an ordered, SUPERVISED campaign of leaf loops.
+# A campaign is a COMPOSITION: each stage is a normal LoopPrint loop (its own
+# loop-spec + verify.sh + maker.sh + run-this-loop.sh). This file is the manifest;
+# lint validates it. The runner stays YAML-blind — the orchestrator (when built)
+# reads the generated `stages` file, never this YAML, and only interprets each
+# stage's process EXIT CODE + state files. It never redefines GREEN/RED.
+#
+# Runner exit-code contract:
+#   0  gate done (verifier GREEN)
+#   2  max-iters reached (ratchet normal stop)
+#   3  HALT file detected
+#   4  human checkpoint declined
+#   5  preflight failed
+#   6  wall-clock budget exhausted (ratchet primary stop)
+#
+# stage_success semantics:
+#   gate    => stage OK on runner exit 0
+#   ratchet => stage OK on runner exit 2 or 6 (reached its stop condition)
+#   anything else => campaign halts and flags
+#
+# On any non-success exit: STOP campaign, record failure, exit non-zero, human replans.
+# Never auto-advance past a failed stage.
+schema_version: 1
+kind: campaign
+goal: "<one-sentence campaign objective>"
+plan: plan.md            # REQUIRED human plan artifact (stage rationale + scope boundary)
+autonomy: checkpoint     # campaigns are supervised — a human checkpoint sits BETWEEN stages
+stages:
+  - slug: stage-1-<name>
+    goal: "<stage subgoal>"
+    loop_dir: stage-1    # a real leaf loop dir (has loop-spec.yaml + verify.sh)
+    stage_success: gate  # gate => OK on exit 0; ratchet => OK on exit 2 or 6
+  - slug: stage-2-<name>
+    goal: "<stage subgoal>"
+    loop_dir: stage-2
+    stage_success: gate
+stop:
+  on_stage_failure: halt-and-flag   # NEVER auto-advance past a failed stage
+  resume: "--from-stage N"          # documented resume after human edits (orchestrator, when built)

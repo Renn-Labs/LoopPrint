@@ -1,0 +1,23 @@
+schema_version: 1
+kind: campaign
+goal: >
+  Reverse-spec a legacy module then drive all findings to zero
+  in two supervised, independently-gated stages.
+plan: plan.md
+autonomy: checkpoint
+stages:
+  - slug: stage-1-reverse-spec
+    goal: >
+      Derive and commit a machine-checkable spec for the target module,
+      verified by the presence of the generated spec.md artifact.
+    loop_dir: stage-1
+    stage_success: gate
+  - slug: stage-2-remediate
+    goal: >
+      Remediate all findings produced by the spec-derived test suite,
+      verified by the presence of the remediated.flag sentinel.
+    loop_dir: stage-2
+    stage_success: gate
+stop:
+  on_stage_failure: halt-and-flag
+  resume: "--from-stage N"

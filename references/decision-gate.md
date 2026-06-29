@@ -59,7 +59,7 @@ shapes differ per archetype — that's the whole point.
 | Drive a metric with **no terminal "done"** (perf, debt, coverage, dep-freshness) | **Persistent / Ralph** | **ratchet** — "no worse than a committed baseline" | **budget** (wall-clock / max-iters) | `pattern: performance` · `verifier.shape: ratchet` · `stop.budget` |
 | Judge subjective quality you **can express as a rubric** (docs, answers, design) | **Critic-panel (Eval)** | **k-of-N independent critics** vs a rubric (judge ≠ maker) | finish-gate (quorum met) | `verifier.kind: critic-panel` · `panel: {n, quorum_k, threshold}` |
 | Coordinate multi-agent output, judged by critics | **Orchestration** | critic-panel over the coordinated result | finish-gate | `verifier.kind: critic-panel` |
-| A multi-stage campaign a human **supervises at checkpoints** (agent runs between them) | **Supervised / Autopilot** | per-stage gate **+ human checkpoint** | finish-gate / budget | `autonomy: checkpoint` |
+| A multi-stage campaign a human **supervises at checkpoints** (agent runs between them) | **Supervised / Autopilot** | per-stage gate **+ human checkpoint** | finish-gate / budget | `autonomy: checkpoint` · see [`references/campaign.md`](campaign.md) for the multi-stage composition schema |
 
 *(`verifier.shape: ratchet` ships with the ratchet/persistent vertical; `verifier.kind: critic-panel` with the
 critic-panel vertical. Route to the archetype; its profile fields come with it.)*
