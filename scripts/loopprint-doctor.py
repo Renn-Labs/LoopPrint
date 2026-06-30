@@ -182,9 +182,9 @@ def check_frontmatter(r: Report) -> None:
         r.add("skill_frontmatter", "FAIL", f"SKILL.md frontmatter missing `{miss}`",
               "SKILL.md must open with a `---` block containing `name:` and `description:`. "
               "Without it the harness won't discover the skill.")
-    elif name != "loopprint":
-        r.add("skill_frontmatter", "WARN", f"frontmatter name is '{name}', expected 'loopprint'",
-              "Set `name: loopprint` in SKILL.md unless you deliberately forked it.")
+    elif name not in ("looptimal", "loopprint"):
+        r.add("skill_frontmatter", "WARN", f"frontmatter name is '{name}', expected 'looptimal'",
+              "Set `name: looptimal` in SKILL.md unless you deliberately forked it.")
     else:
         r.add("skill_frontmatter", "OK", "SKILL.md frontmatter has name + description")
 
@@ -384,7 +384,12 @@ def check_skill_links(r: Report) -> None:
         for d in dirs_fn():
             if d.is_dir():
                 checked = True
-                _check_one_link(r, harness, d / "loopprint")
+                # Looptimal installs the skill as <skills-dir>/looptimal; accept the legacy
+                # loopprint name too so a pre-rebrand folder-skill link still health-checks.
+                link = d / "looptimal"
+                if not link.exists() and (d / "loopprint").exists():
+                    link = d / "loopprint"
+                _check_one_link(r, harness, link)
     if not checked:
         r.add("skill_links", "SKIP",
               "no harness skills dir (Claude/OpenClaw/Hermes/OpenCode) — plugin install, or none present")
@@ -415,7 +420,7 @@ def _enabled_loopprint_plugins(cfg_dir: Path) -> list[str]:
         if isinstance(ep, dict):
             for k, v in ep.items():
                 merged[k] = bool(v)
-    return [k for k, on in merged.items() if on and k.startswith("loopprint@")]
+    return [k for k, on in merged.items() if on and (k.startswith("looptimal@") or k.startswith("loopprint@"))]
 
 
 def check_dual_registration(r: Report) -> None:
@@ -425,7 +430,9 @@ def check_dual_registration(r: Report) -> None:
     check_skill_links catches it — this one cross-references them. The trigger is the plugin being *enabled*
     (what actually loads it), so disabling it clears the warning with no re-clone or file deletion."""
     cfg = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude"))
-    link = cfg / "skills" / "loopprint"
+    link = cfg / "skills" / "looptimal"
+    if not link.exists() and (cfg / "skills" / "loopprint").exists():
+        link = cfg / "skills" / "loopprint"
     folder_live = link.exists()  # follows symlinks; a *dangling* link is False -> not a live registration
     enabled = _enabled_loopprint_plugins(cfg)
     if folder_live and enabled:
