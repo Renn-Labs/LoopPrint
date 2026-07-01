@@ -1,0 +1,15 @@
+# git-allowed-signers file for verifying Looptimal's SSH-signed tags/commits.
+#
+# This is the maintainer's PUBLIC key only (safe to publish — it's already public via
+# GitHub's own "SSH signing keys" page for the account, and every SSH-signed commit/tag
+# on this repo already carries it). It grants no write access to anything; it only lets
+# `git verify-tag`/`git verify-commit` confirm a tag or commit was actually signed by
+# this key, instead of erroring with "allowedSignersFile needs to be configured."
+#
+# Usage:
+#   git config gpg.ssh.allowedSignersFile "$(pwd)/allowed_signers.example"
+#   git verify-tag v2.0.0
+#   git verify-commit <sha>
+#
+# Format: <principal(s)> <key-type> <base64-key>  (see `man ssh-keygen` -Y verify / gpg.ssh docs)
+113260749+Rennlabs@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGMQu4u13T0ZCz00OGvcEXFk4zVJcVwB+gIaJD7Qs1El

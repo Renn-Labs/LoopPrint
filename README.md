@@ -4,11 +4,36 @@
 
 <p align="center"><em>from objective to verified outcome</em></p>
 
+<p align="center">
+  <a href="https://github.com/Renn-Labs/Looptimal/actions/workflows/ci.yml"><img src="https://github.com/Renn-Labs/Looptimal/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/Renn-Labs/Looptimal/stargazers"><img src="https://img.shields.io/github/stars/Renn-Labs/Looptimal" alt="GitHub stars"></a>
+</p>
+
 ---
 
 # Looptimal
 
 Most "autonomous agent" failures aren't prompt problems. They're **missing-loop-component** problems: no durable state, no objective gate, no stop condition, the maker grading its own work. Looptimal fixes that at two levels.
+
+## Prove it in under a minute
+
+No clone required — this runs the real Stage-6 outer verifier against a fixture, tampers with the
+fixture, and confirms the tamper is caught:
+
+```bash
+uvx --from git+https://github.com/Renn-Labs/Looptimal@v2.0.0 verify-outcome --selftest
+```
+
+```text
+SELFTEST GREEN
+```
+
+That single line is the whole pitch: an honest bundle round-trips GREEN, then the same fixture is
+tampered (the artifact the loop claims to have fixed is reverted) with `contract_hash` left
+untouched — and the outer verifier catches it. A maker's self-reported GREEN can't buy a pass here;
+only a live re-check can. This is why maker ≠ checker isn't a slogan in Looptimal — it's the
+literal thing `verify-outcome.py` does on every run, including this one.
 
 At the **loop level**, it refuses to blueprint a loop until all four atoms are real:
 
@@ -21,9 +46,31 @@ At the **loop level**, it refuses to blueprint a loop until all four atoms are r
 
 Plus one rule that ties them together: **maker ≠ checker** — nothing is "done" until something *other than the thing that produced it* says so.
 
+This isn't a hunch. [SpecBench](https://arxiv.org/abs/2605.21384) measures reward hacking as the
+pass-rate gap between a coding agent's visible validation tests and a held-out set covering the
+same requirements, and finds that gap widens ~28 percentage points for every 10× increase in code
+size — even as agents saturate the visible suite. [ImpossibleBench](https://arxiv.org/abs/2510.20270)
+found cheating rates as high as 76% when test files are visible (even mutated), dropping to near
+zero once they're simply hidden from the model. And Cursor's own [SWE-bench Pro
+study](https://cursor.com/blog/reward-hacking-coding-benchmarks) found 63% of "successful"
+resolutions had been retrieved from git history or the public web rather than derived. A maker that
+can see or grade its own gate will, on average, find the gate — not the fix.
+
 At the **outcome level**, Looptimal goes further: it frames a sealed acceptance suite, picks or rejects the right loop archetype, war-games the plan before you commit, dispatches maker and checker agents, and re-runs the sealed suite against live state before anything is called done. "Done" means the outcome is proved against live state by a separate verifier — not asserted by the agent that did the work.
 
 The loop-design wizard (formerly the standalone LoopPrint) is embedded as **Stage 2: Design-loop**. It also runs as a direct fast-path when you only want a loop blueprint. One product, one `/looptimal` skill.
+
+## Demo
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Looptimal: an honest verify-outcome selftest passes GREEN, then a worked critic-panel example runs a quorum PASS followed by a deliberate fail-flip that correctly gates RED" width="720">
+</p>
+
+Every line of output above is real — recorded by actually running `scripts/verify-outcome.py
+--selftest` and `examples/critic-panel/run_demo.sh` (see `scripts/record-demo.py`, and
+[`assets/demo.cast`](assets/demo.cast) for the raw asciinema recording). Nothing is scripted
+sales copy; it's the outer verifier and the critic-panel quorum doing exactly what `SECURITY.md`
+and the pitch above claim, on this exact codebase.
 
 ## Before the loop: the decision gate
 
@@ -72,6 +119,18 @@ Invoke as `/looptimal` (v2.0.0). Say "design a loop for …" for the wizard fast
 | **Codex / OMX** | `cp -r ~/looptimal ~/.codex/skills/looptimal` (re-copy after updates) |
 | **grok build** | add `~/looptimal/SKILL.md` entry to your `AGENTS.md` catalog |
 
+**Just the tooling, no clone.** The doctor/lint/verify scripts are also installable as ordinary
+console commands via [`uv`](https://docs.astral.sh/uv/)/`pipx` — useful if you only want to run
+`looptimal-lint`/`verify-outcome` against your own mission files, not install the skill itself:
+
+```bash
+uvx --from git+https://github.com/Renn-Labs/Looptimal@v2.0.0 verify-outcome --bundle path/to/evidence-bundle.json
+```
+
+This is a convenience layer over the same `scripts/*.py`, not a separate implementation — pin to a
+tagged ref (`@v2.0.0`, not `@main`) so the command doesn't silently move under you. Not yet on
+PyPI; the `uvx --from git+...` form works today without one.
+
 ## Verify it yourself
 
 ```bash
@@ -80,10 +139,12 @@ python3 scripts/verify-outcome.py --selftest        # Stage-6 outer verifier sel
 python3 scripts/loopprint-lint.py examples/ci-triage/loop-spec.yaml   # loop-design wizard gate (GREEN)
 python3 scripts/looptimal-doctor.py                 # install health check
 
-# Worked example round-trip against live state:
-python3 scripts/looptimal-lint.py examples/issue-to-pr-bugfix/mission.yaml
+# Worked example round-trip against live state — sealed with a demo HMAC key (see
+# examples/issue-to-pr-bugfix/DEMO-KEY-NOT-SECRET.hex; loudly non-secret, never reuse it):
+K=examples/issue-to-pr-bugfix/DEMO-KEY-NOT-SECRET.hex
+python3 scripts/looptimal-lint.py examples/issue-to-pr-bugfix/mission.yaml --key-file "$K"
 python3 scripts/verify-outcome.py --bundle examples/issue-to-pr-bugfix/evidence-bundle.json \
-  --workdir examples/issue-to-pr-bugfix --repeat 3
+  --workdir examples/issue-to-pr-bugfix --repeat 3 --key-file "$K"
 ```
 
 ## Security model (and its honest limit)
@@ -108,7 +169,21 @@ From the **Design-loop wizard** (Stage 2 / design fast-path), a self-contained r
 
 From the **full pipeline**, additionally: `acceptance-suite.yaml` + `acceptance-suite.sha256`, Capability Manifest, consensus task graph, Simulate report, and evidence bundle.
 
-Tooling: `loopprint-lint.py` gates the loop spec; `loopprint-ls.py` reports health of every loop in the repo (rot radar); `loopprint-report.py` computes cost-per-accepted-change from `metrics.jsonl`; `loopprint-skillify.py` promotes a GREEN loop to a reusable skill. Verifier recipes: [`templates/verifier-library.yaml`](templates/verifier-library.yaml). Schema contract: [`references/schema.md`](references/schema.md).
+Tooling: `loopprint-lint.py` gates the loop spec; `loopprint-ls.py` reports health of every loop in the repo (rot radar) — `--update-index` opts a repo's loops into an append-only, local-only `~/.loopprint/index.jsonl`, and `loopprint-ls.py --global` reads it back ranked by cost-per-accepted-change across every repo that's opted in, flagging ROTTEN loops; deleting the index loses nothing, it's a rebuildable pointer cache; `loopprint-report.py` computes cost-per-accepted-change from `metrics.jsonl`; `loopprint-skillify.py` promotes a GREEN loop to a reusable skill. Verifier recipes: [`templates/verifier-library.yaml`](templates/verifier-library.yaml). Schema contract: [`references/schema.md`](references/schema.md).
+
+## Updating
+
+```bash
+python3 scripts/loopprint-update.py            # dry-run: shows what would change, does nothing
+python3 scripts/loopprint-update.py --apply    # performs it
+```
+
+Symlinked installs (Claude Code folder skill, OpenCode, OpenClaw/EClaw, Hermes) update for free
+the moment you `git pull` the clone they point at. Copy-based installs (Codex/OMX:
+`cp -r ~/looptimal ~/.codex/skills/looptimal`) don't — `loopprint-update.py` `git pull`s the clone
+and re-syncs any copy-based install it finds at a known path, reporting exactly what changed
+(never anything untracked — `.omc/`/`.buildlog/`-style local state is never synced). Dry-run by
+default; nothing is touched without `--apply`.
 
 ## Troubleshooting
 

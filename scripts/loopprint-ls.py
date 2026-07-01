@@ -25,11 +25,25 @@ Usage:
                   [--json] [--rotten] [--exit-nonzero-if-rotten]
 """
 from __future__ import annotations
-import sys, re, json, argparse, subprocess
+import sys, re, json, argparse, subprocess, importlib.util
 from pathlib import Path
 from datetime import datetime, timezone
 
 DEFAULT_ROOTS = ["loops", ".omc/loops"]
+GLOBAL_INDEX_PATH = Path.home() / ".loopprint" / "index.jsonl"
+
+
+def _load_report_module():
+    """Dynamically load loopprint-report.py (hyphenated filename, same technique used
+    throughout this repo's tests) to reuse its cost_per_accepted_change computation rather
+    than duplicating it."""
+    path = Path(__file__).resolve().parent / "loopprint-report.py"
+    spec = importlib.util.spec_from_file_location("loopprint_report", path)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _detect_binding(script_dir: Path, cwd: Path) -> dict:
@@ -226,6 +240,96 @@ def _age_str(last_ts, now):
     return f"{int(sec // 86400)}d ago"
 
 
+def _cost_per_accepted_change(loop_dir: Path):
+    """Reuses loopprint-report.py's summarize() against this loop's metrics.jsonl, if present.
+    Returns None when there's no metrics.jsonl or no cost data in it (tokens/cost_usd are
+    optional, injected by a per-harness adapter — see loopprint-report.py's own docstring)."""
+    metrics_path = loop_dir / "metrics.jsonl"
+    if not metrics_path.is_file():
+        return None
+    report = _load_report_module()
+    if report is None:
+        return None
+    records, _skipped = report._load_metrics(metrics_path)
+    summary = report.summarize(records, _skipped)
+    return summary["cost_per_accepted_change"]
+
+
+def _append_to_global_index(rows: list[dict], cwd: Path, now: datetime) -> int:
+    """Opt-in, append-only: one JSON line per loop, tagged with the repo path so --global can
+    aggregate across repos later. Strictly local — no network. Deleting index.jsonl loses
+    nothing; the next --update-index run in each repo rebuilds its slice of it."""
+    GLOBAL_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    written = 0
+    with GLOBAL_INDEX_PATH.open("a", encoding="utf-8") as fh:
+        for r in rows:
+            entry = {
+                "repo": str(cwd.resolve()),
+                "slug": r["slug"],
+                "status": r["status"],
+                "last_run": r["last_run"],
+                "cost_per_accepted_change": _cost_per_accepted_change(Path(r["dir"])),
+                "indexed_at": now.isoformat(timespec="seconds"),
+            }
+            fh.write(json.dumps(entry) + "\n")
+            written += 1
+    return written
+
+
+def _read_global_index() -> list[dict]:
+    """Latest entry per (repo, slug) — append-only file, so the last occurrence wins. Missing
+    file is treated as an empty index (rebuildable, not an error)."""
+    if not GLOBAL_INDEX_PATH.is_file():
+        return []
+    latest: dict[tuple[str, str], dict] = {}
+    with GLOBAL_INDEX_PATH.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            key = (entry.get("repo"), entry.get("slug"))
+            if None in key:
+                continue
+            latest[key] = entry
+    return list(latest.values())
+
+
+def _print_global(entries: list[dict], as_json: bool) -> int:
+    # Rank by cost_per_accepted_change ascending (cheaper first); entries with no cost data
+    # (no tokens/cost_usd ever injected) sort last, not first — missing data isn't "free."
+    def _sort_key(e):
+        cpac = e.get("cost_per_accepted_change")
+        return (cpac is None, cpac if cpac is not None else 0.0)
+
+    ranked = sorted(entries, key=_sort_key)
+    rotten = [e for e in ranked if e.get("status") == "ROTTEN"]
+
+    if as_json:
+        print(json.dumps({"index_path": str(GLOBAL_INDEX_PATH), "loops": ranked}, indent=2))
+        return 1 if rotten else 0
+
+    if not ranked:
+        print(f"No entries in the global index ({GLOBAL_INDEX_PATH}). "
+             f"Run `loopprint-ls.py --update-index` in a repo with loops first.")
+        return 0
+
+    print(f"{'REPO':<40} {'SLUG':<20} {'STATUS':<10} {'COST/ACCEPTED':>15}")
+    for e in ranked:
+        repo = e.get("repo") or "-"
+        short_repo = repo if len(repo) <= 40 else "…" + repo[-39:]
+        cpac = e.get("cost_per_accepted_change")
+        cpac_str = f"${cpac:,.6f}".rstrip("0").rstrip(".") if cpac is not None else "n/a"
+        print(f"{short_repo:<40} {e.get('slug', '-'):<20} {e.get('status', '-'):<10} {cpac_str:>15}")
+    if rotten:
+        names = ", ".join(f"{e['repo']}:{e['slug']}" for e in rotten)
+        print(f"\n⚠  ROTTEN across repos: {names}", file=sys.stderr)
+    return 1 if rotten else 0
+
+
 def main(argv) -> int:
     ap = argparse.ArgumentParser(prog="loopprint-ls.py", description="Repo-local loop health view (rot radar).")
     ap.add_argument("--dir", action="append", default=[], help="extra root to scan (repeatable)")
@@ -235,7 +339,18 @@ def main(argv) -> int:
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--rotten", action="store_true", help="show only ROTTEN + STALE loops")
     ap.add_argument("--exit-nonzero-if-rotten", action="store_true", help="exit 1 if any loop is ROTTEN (CI hook)")
+    ap.add_argument("--global", dest="global_view", action="store_true",
+                    help="Tier-2: read the opt-in global index (~/.loopprint/index.jsonl) "
+                    "instead of scanning this repo; ranks by cost-per-accepted-change across "
+                    "repos and flags ROTTEN loops. Populate the index with --update-index.")
+    ap.add_argument("--update-index", action="store_true",
+                    help="opt-in: append this repo's current loop health + "
+                    "cost-per-accepted-change to the global index (~/.loopprint/index.jsonl). "
+                    "Strictly local, append-only; deleting the index loses nothing.")
     args = ap.parse_args(argv[1:])
+
+    if args.global_view:
+        return _print_global(_read_global_index(), args.json)
 
     cwd = Path.cwd()
     script_dir = Path(__file__).resolve().parent
@@ -268,6 +383,11 @@ def main(argv) -> int:
         rows = [r for r in rows if r["status"] in ("ROTTEN", "STALE")]
 
     any_rotten = any(r["status"] == "ROTTEN" for r in rows)
+
+    if args.update_index:
+        n = _append_to_global_index(rows, cwd, now)
+        print(f"loopprint-ls: appended {n} entr{'y' if n == 1 else 'ies'} to {GLOBAL_INDEX_PATH}",
+             file=sys.stderr)
 
     if args.json:
         print(json.dumps({"scanned_roots": roots, "loops": rows}, indent=2))

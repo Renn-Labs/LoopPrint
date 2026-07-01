@@ -36,9 +36,11 @@ python3 scripts/looptimal-lint.py --selftest
 python3 scripts/verify-outcome.py --selftest
 python3 scripts/looptimal-doctor.py
 python3 scripts/looptimal-detect.py
-python3 scripts/looptimal-lint.py examples/issue-to-pr-bugfix/mission.yaml
+python3 scripts/looptimal-lint.py examples/issue-to-pr-bugfix/mission.yaml \
+  --key-file examples/issue-to-pr-bugfix/DEMO-KEY-NOT-SECRET.hex
 python3 scripts/verify-outcome.py --bundle examples/issue-to-pr-bugfix/evidence-bundle.json \
-  --workdir examples/issue-to-pr-bugfix --repeat 3
+  --workdir examples/issue-to-pr-bugfix --repeat 3 \
+  --key-file examples/issue-to-pr-bugfix/DEMO-KEY-NOT-SECRET.hex
 ```
 Lint/verify self-tests must print GREEN, doctor must be HEALTHY, and the example must round-trip
 (its sealed behavioral criteria are re-run against live state).
@@ -75,3 +77,13 @@ git tag -s vX.Y.Z -m "Looptimal vX.Y.Z"        # signed tag (needs a configured 
 git push origin vX.Y.Z
 gh release create vX.Y.Z -F release-notes-vX.Y.Z.md --title "Looptimal vX.Y.Z"
 ```
+
+Tags are SSH-signed by default on this repo (`gpg.format=ssh`, `tag.gpgsign=true`) and GitHub
+already shows them "Verified." To verify a tag **locally**, without trusting GitHub's UI —
+`git verify-tag`/`git verify-commit` need an allowed-signers file, which isn't a git default:
+```bash
+git config gpg.ssh.allowedSignersFile "$(pwd)/allowed_signers.example"   # or: -c for one-off
+git verify-tag v2.0.0
+```
+`allowed_signers.example` at the repo root carries the maintainer's *public* key only — no write
+access implied — in the standard `git-allowed-signers` format.

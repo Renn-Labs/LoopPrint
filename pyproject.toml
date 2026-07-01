@@ -1,0 +1,50 @@
+[project]
+name = "looptimal"
+version = "2.0.0"
+description = "Turns an objective into a delivered, VERIFIED outcome: frames a hash-pinned sealed acceptance suite, designs the right loop (the loop-design wizard, formerly LoopPrint), war-games it forward, executes with dynamic domain-expert sub-agents (maker != checker), and gates completion on a separate verifier re-running the sealed suite against live state."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Erik Ford" }]
+requires-python = ">=3.10"
+# Zero runtime dependencies — the core is stdlib-only by design. PyYAML is an
+# optional extra (`pip install looptimal[yaml]`) that lint/profiles degrade
+# gracefully without. See CONTRIBUTING.md "Stdlib-only scripts".
+dependencies = []
+
+[project.optional-dependencies]
+yaml = ["pyyaml"]
+
+[project.urls]
+Homepage = "https://github.com/Renn-Labs/Looptimal"
+Repository = "https://github.com/Renn-Labs/Looptimal"
+Issues = "https://github.com/Renn-Labs/Looptimal/issues"
+
+# This packaging is a convenience layer, NOT the primary distribution path.
+# Looptimal is a self-contained folder skill (SKILL.md + templates/ +
+# references/) — install it per README.md ("Other harnesses" table) for
+# normal use. `[project.scripts]` exists so `uvx`/`pipx` can run the
+# doctor/lint/verify tooling without a git clone. Every function below is a
+# thin delegating wrapper (looptimal_cli/__init__.py) — the scripts/*.py
+# files remain the single source of truth.
+[project.scripts]
+looptimal-doctor = "looptimal_cli:doctor"
+looptimal-lint = "looptimal_cli:lint"
+looptimal-detect = "looptimal_cli:detect"
+verify-outcome = "looptimal_cli:verify_outcome"
+loopprint-detect = "looptimal_cli:loopprint_detect"
+loopprint-doctor = "looptimal_cli:loopprint_doctor"
+loopprint-lint = "looptimal_cli:loopprint_lint"
+loopprint-ls = "looptimal_cli:loopprint_ls"
+loopprint-skillify = "looptimal_cli:loopprint_skillify"
+loopprint-report = "looptimal_cli:loopprint_report"
+loopprint-update = "looptimal_cli:loopprint_update"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# scripts/ ships alongside looptimal_cli/ so the wrapper functions can find
+# the real scripts/*.py files at runtime after install (they are the actual
+# CLI logic; looptimal_cli is only the [project.scripts] entry-point shim).
+packages = ["looptimal_cli", "scripts"]

@@ -1,5 +1,6 @@
 """Tests for loopprint-ls.py (repo-local loop health / rot radar)."""
 import json
+import os
 import subprocess
 import sys
 import importlib.util
@@ -47,6 +48,15 @@ def _run(cwd: Path, *args):
     p = subprocess.run([sys.executable, str(LS), *args], cwd=cwd,
                        capture_output=True, text=True)
     return p
+
+
+def _run_with_home(cwd: Path, fake_home: Path, *args):
+    # Isolates ~/.loopprint/index.jsonl to a tmp HOME — the real global-index tests must never
+    # touch whatever machine actually runs this suite (same discipline as test_update.py's
+    # COPY_TARGETS caution: a hardcoded real-path side effect in a test is a real hazard).
+    env = {**os.environ, "HOME": str(fake_home)}
+    return subprocess.run([sys.executable, str(LS), *args], cwd=cwd, env=env,
+                          capture_output=True, text=True)
 
 
 def _statuses(cwd: Path, *args):
@@ -193,3 +203,89 @@ def test_parse_ts_handles_z_suffix():
     assert dt is not None and dt.tzinfo is not None
     assert ls._parse_ts(None) is None
     assert ls._parse_ts("garbage") is None
+
+
+# ---- Tier-2: --update-index / --global (issue #8) --------------------------
+def test_update_index_is_opt_in_and_does_not_run_by_default(tmp_path):
+    now = datetime.now(timezone.utc)
+    _mk_loop(tmp_path, "loop1", [_rec(1, "GREEN", now - timedelta(minutes=1))])
+    fake_home = tmp_path / "fakehome"
+    fake_home.mkdir()
+    _run_with_home(tmp_path, fake_home)  # plain run, no --update-index
+    assert not (fake_home / ".loopprint" / "index.jsonl").exists()
+
+
+def test_update_index_appends_cost_per_accepted_change(tmp_path):
+    now = datetime.now(timezone.utc)
+    loop_dir = tmp_path / "loops" / "loop1"
+    loop_dir.mkdir(parents=True)
+    record = {"iter": 1, "ts": _iso(now - timedelta(minutes=1)), "wall_ms": 5,
+             "verifier_result": "GREEN", "accepted": True, "tokens": 1000, "cost_usd": 0.02}
+    (loop_dir / "metrics.jsonl").write_text(json.dumps(record) + "\n")
+    fake_home = tmp_path / "fakehome"
+    fake_home.mkdir()
+    result = _run_with_home(tmp_path, fake_home, "--update-index")
+    assert result.returncode == 0
+
+    index_path = fake_home / ".loopprint" / "index.jsonl"
+    assert index_path.exists()
+    lines = index_path.read_text().splitlines()
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["slug"] == "loop1"
+    assert entry["repo"] == str(tmp_path.resolve())
+    assert entry["cost_per_accepted_change"] == 0.02
+
+
+def test_global_view_dedupes_to_latest_entry_per_repo_and_slug(tmp_path):
+    fake_home = tmp_path / "fakehome"
+    (fake_home / ".loopprint").mkdir(parents=True)
+    index = fake_home / ".loopprint" / "index.jsonl"
+    index.write_text(
+        json.dumps({"repo": "/r", "slug": "l1", "status": "HEALTHY",
+                   "cost_per_accepted_change": 0.5, "indexed_at": "2026-06-01T00:00:00"}) + "\n"
+        + json.dumps({"repo": "/r", "slug": "l1", "status": "ROTTEN",
+                     "cost_per_accepted_change": None, "indexed_at": "2026-07-01T00:00:00"}) + "\n"
+    )
+    result = _run_with_home(tmp_path, fake_home, "--global", "--json")
+    assert result.returncode == 1  # ROTTEN present
+    payload = json.loads(result.stdout)
+    assert len(payload["loops"]) == 1  # deduped to one entry, not two
+    assert payload["loops"][0]["status"] == "ROTTEN"  # the LATEST status, not the stale one
+
+
+def test_global_view_ranks_by_cost_per_accepted_change_cheapest_first(tmp_path):
+    fake_home = tmp_path / "fakehome"
+    (fake_home / ".loopprint").mkdir(parents=True)
+    index = fake_home / ".loopprint" / "index.jsonl"
+    index.write_text(
+        json.dumps({"repo": "/r", "slug": "expensive", "status": "HEALTHY",
+                   "cost_per_accepted_change": 5.0, "indexed_at": "2026-07-01T00:00:00"}) + "\n"
+        + json.dumps({"repo": "/r", "slug": "cheap", "status": "HEALTHY",
+                     "cost_per_accepted_change": 0.1, "indexed_at": "2026-07-01T00:00:00"}) + "\n"
+        + json.dumps({"repo": "/r", "slug": "unknown-cost", "status": "HEALTHY",
+                     "cost_per_accepted_change": None, "indexed_at": "2026-07-01T00:00:00"}) + "\n"
+    )
+    result = _run_with_home(tmp_path, fake_home, "--global", "--json")
+    slugs = [loop["slug"] for loop in json.loads(result.stdout)["loops"]]
+    assert slugs == ["cheap", "expensive", "unknown-cost"]  # cheapest first, unknown-cost last
+
+
+def test_global_view_on_missing_index_is_empty_not_an_error(tmp_path):
+    fake_home = tmp_path / "fakehome"
+    fake_home.mkdir()
+    result = _run_with_home(tmp_path, fake_home, "--global")
+    assert result.returncode == 0
+    assert "No entries in the global index" in result.stdout
+
+
+def test_global_index_never_touched_by_a_plain_run_no_network_no_surprise_writes(tmp_path):
+    # The index is strictly opt-in and local — nothing about --global or --update-index should
+    # make any network call; this just re-confirms the opt-in property end-to-end via subprocess.
+    now = datetime.now(timezone.utc)
+    _mk_loop(tmp_path, "loop1", [_rec(1, "GREEN", now - timedelta(minutes=1))])
+    fake_home = tmp_path / "fakehome"
+    fake_home.mkdir()
+    for extra_args in ([], ["--json"], ["--exit-nonzero-if-rotten"]):
+        _run_with_home(tmp_path, fake_home, *extra_args)
+    assert not (fake_home / ".loopprint").exists()

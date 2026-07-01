@@ -9,7 +9,10 @@ Thanks for your interest. Looptimal is a small, focused skill — contributions 
   config. Harness-specific behavior belongs in a `profile.yaml` (see [`references/profiles.md`](references/profiles.md)),
   never hardcoded in the repo. The detector may *name* a harness; it must never embed that harness's binding values.
 - **Stdlib-only scripts.** `scripts/*.py` use the Python standard library. PyYAML is the one optional
-  dependency, and the tools degrade gracefully without it. No network calls.
+  dependency, and the tools degrade gracefully without it. No network calls — CI's `no-network-imports`
+  job (`scripts/check-no-network-imports.py`) fails the build if a network-capable import creeps in.
+  Honesty note: that's a self-authored regression guard, not an independent third-party audit — we'd
+  welcome a PR wiring in a genuinely independent skill-auditing tool if a stable one turns up.
 - **Honest gates.** Don't add a verifier the maker can satisfy by self-assessment. Maker ≠ checker.
 
 ## Development
