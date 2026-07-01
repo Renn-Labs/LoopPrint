@@ -102,7 +102,7 @@ def validate_persona(text: str) -> list[str]:
         fm_lines = [ln for ln in bodies["Failure Mode I Own"].splitlines() if ln.strip()]
         if len(fm_lines) != 1 or not FAILURE_MODE_RE.match(fm_lines[0].strip()):
             findings.append(
-                "'## Failure Mode I Own' must be exactly one line: '**Named Failure Mode** — description'"
+                "'## Failure Mode I Own' must be exactly one line: '**Named Failure Mode** -- description'"
             )
 
         cl_lines = [ln for ln in bodies["Checklist I Apply"].splitlines() if ln.strip()]
@@ -170,7 +170,7 @@ what does it own, in general, beyond this one mission?]
 well this mission, not from the mission's specific task list]
 
 ## Failure Mode I Own
-**[FILL IN: Named Failure Mode]** — [FILL IN: one-sentence description of the failure mode \
+**[FILL IN: Named Failure Mode]** -- [FILL IN: one-sentence description of the failure mode \
 this expert specifically guards against, independent of this mission]
 
 ## Anti-Patterns to Avoid
@@ -221,6 +221,13 @@ def promote(slug: str, candidate_path: Path, scope: str, write: bool, force: boo
 
 
 def main(argv: list[str] | None = None) -> int:
+    # draft-from echoes arbitrary prose extracted from a candidate persona (Anti-patterns /
+    # Pre-action checklist), which may legitimately contain non-ASCII (em dashes are the real
+    # curated personas/ convention). Without this, Windows' default console codepage can mangle
+    # or fail to encode it -- force real UTF-8 regardless of platform/console state.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+
     ap = argparse.ArgumentParser(
         description="Promote a Tier-B synthesized persona into the curated personas/ library."
     )
