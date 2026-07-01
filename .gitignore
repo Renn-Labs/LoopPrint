@@ -31,3 +31,7 @@ node_modules/
 .patchright/
 /LoopPrint
 /Looptimal
+
+# Raw build-in-public journal — internal narrative, read off-disk by the marketing process.
+# Never ships in the public OSS history. See CLAUDE.md "Build Journal".
+.buildlog/
