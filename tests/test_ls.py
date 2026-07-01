@@ -54,9 +54,12 @@ def _run_with_home(cwd: Path, fake_home: Path, *args):
     # Isolates ~/.loopprint/index.jsonl to a tmp HOME — the real global-index tests must never
     # touch whatever machine actually runs this suite (same discipline as test_update.py's
     # COPY_TARGETS caution: a hardcoded real-path side effect in a test is a real hazard).
-    env = {**os.environ, "HOME": str(fake_home)}
+    # pathlib.Path.home() checks USERPROFILE before HOME on Windows (ntpath.expanduser's own
+    # precedence) — overriding only HOME silently no-ops there, leaving Path.home() pointed at
+    # the real runner profile. Override both; USERPROFILE is simply unused/ignored on POSIX.
+    env = {**os.environ, "HOME": str(fake_home), "USERPROFILE": str(fake_home)}
     return subprocess.run([sys.executable, str(LS), *args], cwd=cwd, env=env,
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8")
 
 
 def _statuses(cwd: Path, *args):

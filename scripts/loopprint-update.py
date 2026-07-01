@@ -101,13 +101,13 @@ def _diff_copy_target(repo_root: Path, target: Path) -> list[str]:
         src_file = repo_root / rel
         dst_file = target / rel
         if not dst_file.exists():
-            changes.append(f"  + add    {rel}")
+            changes.append(f"  + add    {rel.as_posix()}")
         elif src_file.read_bytes() != dst_file.read_bytes():
-            changes.append(f"  ~ update {rel}")
+            changes.append(f"  ~ update {rel.as_posix()}")
     if target.is_dir():
         dst_files = {p.relative_to(target) for p in target.rglob("*") if p.is_file()}
         for rel in sorted(dst_files - src_files):
-            changes.append(f"  - remove {rel}")
+            changes.append(f"  - remove {rel.as_posix()}")
     return changes or ["  already in sync"]
 
 
