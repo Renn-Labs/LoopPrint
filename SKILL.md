@@ -212,6 +212,7 @@ Apply safe `fix:` lines yourself; for anything that re-clones, edits user config
 - No meta-loop: the orchestrator must not grade its own orchestration as the outcome.
 - No "done" without Stage 6 Verify-outcome GREEN on live state — loop self-reported GREEN is informational only.
 - No promotion of a failing loop into a reusable skill — `loopprint-skillify` applies only after the sealed checker passes.
+- No promotion of a synthesized persona into the curated library from an unverified or maker-only-reported mission — `looptimal-persona-promote` applies only after Stage 6 is checker GREEN.
 - Log state + verifier result every iteration; only the sealed checker permits outcome completion.
 - No loop without a safety limit. No autonomous run without Step 6 / human GO approval.
 - Irreversible actions become human checkpoints, never autonomous steps.

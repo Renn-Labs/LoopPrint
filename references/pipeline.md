@@ -388,7 +388,10 @@ Present: objective, `contract_hash`, archetype, irreversibles list, open externa
 4. **Oracle results summary** — per-criterion final values.
 5. **Resume pointers** — if FAIL: exact stage/node to resume; if GREEN: none.
 6. **Lessons** — feed LoopPrint skillify only after **checker GREEN** (never on maker report).
-7. **Re-Frame schedule** — for Recurring / Persistent-ratchet: next seal date.
+7. **Persona promotion** — if a Tier B synthesized persona was used this mission *and* Stage 6 is
+   **checker GREEN** (never on maker report), offer to promote it into the curated `personas/`
+   library at project or user scope. See [`agent-foundry.md` §9](agent-foundry.md#9-promotion-dynamism--consistency).
+8. **Re-Frame schedule** — for Recurring / Persistent-ratchet: next seal date.
 
 ### Outputs / artifacts
 | Artifact | Purpose |

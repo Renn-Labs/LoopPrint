@@ -59,6 +59,10 @@ def verify_outcome() -> None:
     _run_no_arg("verify-outcome")
 
 
+def persona_promote() -> None:
+    _run_no_arg("looptimal-persona-promote")
+
+
 # --- loopprint-* (loop-design/wizard layer): main(argv) takes sys.argv ---
 def loopprint_detect() -> None:
     _run_with_argv("loopprint-detect")

@@ -91,7 +91,9 @@ Persona load order:
 
 1. `personas/<capability-id>.md` — curated, versioned, ships in-repo (**consistency**)
 2. `personas/<domain-slug>.md` — fallback slug from manifest `domain` field
-3. `templates/agent-persona.md` — meta-template fill (**dynamism**)
+3. `~/.looptimal/personas/<capability-id>.md` — curated, user-level, promoted across projects (**consistency**, see §9)
+4. `~/.looptimal/personas/<domain-slug>.md` — same, by domain slug
+5. `templates/agent-persona.md` — meta-template fill (**dynamism**)
 
 Meta-template variables (all required at synthesis time):
 
@@ -203,6 +205,45 @@ The foundry is fully functional with zero native agents. Registry entries are ac
 
 ---
 
+## 9. Promotion: Dynamism → Consistency
+
+§3 draws Consistency and Dynamism as two tiers with no promotion path between them. There is one,
+but it is not automatic: a Tier B synthesized persona is heavily mission-bound by design
+(`{mission-context}`/`{success-criteria}` embed *that run's* objective, task-node scope, and
+criterion IDs) while a curated persona (§2 Tier A) carries zero mission-specific content —
+Identity / Core Capabilities / Failure Mode I Own / Anti-Patterns to Avoid / Checklist I Apply.
+Promotion is therefore a **content rewrite**, not a file copy — a judgment call for whoever (the
+AI in-session, or a human) drafts the generalized version, not something a script can do alone.
+
+**When to offer it (Stage 7 Persist, never earlier):** a Tier B persona was used this mission
+*and* the mission's Stage 6 outcome-verifier result is GREEN. Never promote from an unverified or
+maker-only-reported run — same discipline as `loopprint-skillify`'s "only after the sealed
+checker passes" rule for loop → skill promotion.
+
+**Mechanics** (`scripts/looptimal-persona-promote.py`):
+
+1. `draft-from <tier-b-persona.md> --capability <slug>` — mechanical extraction only. Pulls the
+   rendered `Anti-patterns (do not)` and `Pre-action checklist` sections out of the Tier B
+   persona and prints a skeleton in the curated shape, with `[FILL IN: ...]` markers for Identity
+   / Core Capabilities / Failure Mode I Own (sections a Tier B persona has no equivalent for —
+   generalizing into these requires judgment about what the persona did well, not just extracting
+   text). Never writes to disk.
+2. Whoever is drafting fills in the marked sections and strips any surviving mission-specific
+   content from the extracted sections too — the script's extraction is mechanical, not judgment;
+   it does not itself generalize.
+3. `promote <slug> <finished-persona.md> [--scope project|user] [--write] [--force]` — validates
+   the finished candidate against the curated format (exactly the 5 sections in order, bullet vs.
+   numbered-list shape per section, no leftover `{placeholder}` or `[FILL IN ...]` markers, no
+   surviving mission-specific IDs by heuristic) and, with `--write`, persists it. Dry-run by
+   default — same convention as `loopprint-skillify.py`'s `--write` flag.
+
+**Scope:**
+- `project` → `personas/<slug>.md` — this repo's existing curated library.
+- `user` → `~/.looptimal/personas/<slug>.md` — new, resolved by §2's persona load order above,
+  available to every project this user runs Looptimal in, not just this one.
+
+---
+
 ## Related
 
 - Process roles and lane routing: [`roles.md`](roles.md)
@@ -211,3 +252,5 @@ The foundry is fully functional with zero native agents. Registry entries are ac
 - Stage 3 task graph: [`pipeline.md`](pipeline.md)
 - Stage 5 execute: [`pipeline.md`](pipeline.md)
 - Persona meta-template: [`../templates/agent-persona.md`](../templates/agent-persona.md)
+- Promotion mechanics (§9): [`../scripts/looptimal-persona-promote.py`](../scripts/looptimal-persona-promote.py)
+- Analogous loop → skill promotion: [`../scripts/loopprint-skillify.py`](../scripts/loopprint-skillify.py)
