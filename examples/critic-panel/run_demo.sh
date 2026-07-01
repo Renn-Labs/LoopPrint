@@ -41,7 +41,7 @@ cp "$SCRIPT_DIR/loop-spec.yaml" \
    "$SCRIPT_DIR/verify.sh" \
    "$D2"/
 
-sed -i 's/"score": 85/"score": 50/' "$D2/critic-2.sh"
+sed -i.bak 's/"score": 85/"score": 50/' "$D2/critic-2.sh" && rm -f "$D2/critic-2.sh.bak"
 
 if (cd "$D2" && bash verify.sh); then
   echo "exit=0  (UNEXPECTED — panel should have failed)"

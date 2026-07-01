@@ -2,13 +2,38 @@
 both accepts an honest judge and catches a broken/lazy one, mirroring the tamper-to-RED pattern
 used throughout this repo's other selftests."""
 import os
+import shutil
 import subprocess
+import sys
 import textwrap
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 CALIBRATION = REPO / "examples" / "critic-panel" / "calibration"
 CHECK = CALIBRATION / "check_calibration.sh"
+
+
+def _bash_ok() -> bool:
+    """Same check as tests/test_runner_ratchet.py: the GitHub windows-latest runner ships
+    bash.exe as the WSL launcher stub with no distro installed. Skip on Windows CI instead of
+    failing spuriously."""
+    if sys.platform.startswith("win"):
+        return False
+    b = shutil.which("bash")
+    if not b:
+        return False
+    try:
+        out = subprocess.run([b, "-c", "echo ok"], capture_output=True, text=True, timeout=10)
+        return out.stdout.strip() == "ok"
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _bash_ok(), reason="judge-calibration check needs a POSIX bash (skipped on Windows CI)"
+)
 
 
 def test_honest_judge_passes_calibration():

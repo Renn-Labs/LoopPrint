@@ -2,12 +2,37 @@
 JSON critic contract (item 11) actually works end-to-end, both the quorum-PASS and the
 fail-flip quorum-FAIL path, the way tests/test_runner_ratchet.py covers run-this-loop.sh."""
 import json
+import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 EXAMPLE = REPO / "examples" / "critic-panel"
 DEMO = EXAMPLE / "run_demo.sh"
+
+
+def _bash_ok() -> bool:
+    """Same check as tests/test_runner_ratchet.py: the GitHub windows-latest runner ships
+    bash.exe as the WSL launcher stub with no distro installed, so shelling out to it exits
+    non-zero rather than running anything. Skip on Windows CI instead of failing spuriously."""
+    if sys.platform.startswith("win"):
+        return False
+    b = shutil.which("bash")
+    if not b:
+        return False
+    try:
+        out = subprocess.run([b, "-c", "echo ok"], capture_output=True, text=True, timeout=10)
+        return out.stdout.strip() == "ok"
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _bash_ok(), reason="critic-panel demo needs a POSIX bash (skipped on Windows CI)"
+)
 
 
 def test_run_demo_shows_pass_then_fail_flip():

@@ -2,10 +2,36 @@
 .cast file (not that the demo LOOKS a certain way, just that the mechanism is sound)."""
 import importlib.util
 import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "record-demo.py"
+
+
+def _bash_ok() -> bool:
+    """record() shells out to `bash run_demo.sh` for one of its steps. Same check as
+    tests/test_runner_ratchet.py: the GitHub windows-latest runner ships bash.exe as the WSL
+    launcher stub with no distro installed. Skip on Windows CI instead of failing spuriously."""
+    if sys.platform.startswith("win"):
+        return False
+    b = shutil.which("bash")
+    if not b:
+        return False
+    try:
+        out = subprocess.run([b, "-c", "echo ok"], capture_output=True, text=True, timeout=10)
+        return out.stdout.strip() == "ok"
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _bash_ok(), reason="record-demo needs a POSIX bash (skipped on Windows CI)"
+)
 
 
 def _load():
