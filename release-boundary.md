@@ -57,6 +57,55 @@ single product (`CHANGELOG.md [2.0.0]`). Everything below is **already public on
 
 ---
 
+## v2.1.0 — Looptimal (pending tag)
+
+What changed: everything in `CHANGELOG.md [2.1.0]` — the cryptographic sealed-contract hardening
+(HMAC-SHA256 keyed mode + sealed-tree materials manifest), the checker-only visibility tier,
+hard/soft gate labeling, structured critic verdicts, judge-calibration + two new oracles, packaging
+(`pyproject.toml`/`looptimal_cli/`), `looptimal-persona-promote.py`, the demo asset, the 20-item
+roadmap, `references/receipt.md`, and the `SKILL.md` single-pass mode fork. Unlike v2.0.0 (which
+absorbed a previously-private codebase), **every line here was authored directly on this public
+repo's `main` branch** — there is no separate, unpublished source this release draws from.
+
+- **OPEN (confirm):**
+  - The cryptographic framer hash-pin (`--key-file` / `LOOPTIMAL_FRAMER_KEY`) and sealed-tree
+    materials manifest — `scripts/_common.py`, adversarially reviewed per the Review gate below.
+  - Checker-only visibility tier, hard/soft gate labeling, structured critic verdicts, judge
+    calibration, the two new oracle patterns — `scripts/looptimal-lint.py`, `templates/`,
+    `references/oracle-library.md`.
+  - Packaging (`pyproject.toml`, `looptimal_cli/`), `looptimal-persona-promote.py`, the demo asset,
+    `ROADMAP.md`, `references/receipt.md`, and the `SKILL.md` mode-fork / single-pass mode.
+- **WITHHELD / proprietary:** **None.** No component of this release was absorbed from a private
+  source — it is new work authored on public `main`, same as the rest of the repo's history since
+  the v2.0.0 rebrand. — confirmed by the maintainer, 2026-07-01.
+- **Disclosed residual:** unchanged in kind, narrower in scope. Unkeyed mode (the default) still
+  carries the same residual as v2.0.0/v1.1.0: OS-permission sealing only, recomputable by anyone who
+  can write `sealed/`. The keyed HMAC mode (new this release) closes the recompute-after-tamper gap
+  and is adversarially verified per the Review gate below; its own residual is key custody — the
+  framer key must live outside every maker-writable root, or the guarantee it provides doesn't hold.
+  Not marketed as fully tamper-proof in either mode.
+
+**Boundary sign-off (v2.1.0):**  ☑ confirmed  ·  maintainer: **Erik Ford (Renn Labs)**  ·  date: **2026-07-01**
+
+---
+
+## Reconcile checklist (v2.1.0) — gated on the sign-off above
+
+1. ☑ Maintainer confirms the **WITHHELD** section (nothing this release should have stayed private).
+   2026-07-01.
+2. ☑ `release-boundary.md` v2.1.0 block **signed** (verifiable attestation = the `git commit -s`
+   updating this file under the maintainer's identity).
+3. ☑ Ran the `RELEASE.md` offline gates + hazard scan from a clean tree — all GREEN/HEALTHY, hazard
+   scan matches reviewed and confirmed pre-existing/benign (no new secrets, local paths, or private
+   references). 2026-07-01.
+4. ☐ Adversarial review of the enforcement scripts for gaming bypasses (`looptimal-lint.py`,
+   `verify-outcome.py`, `_common.py`) — in progress, required before tagging.
+5. ☐ Tag **`v2.1.0`** and cut the GitHub Release.
+6. ☐ **Only then** — separate maintainer "go" — publish any announcement referencing v2.1.0
+   specifically (the existing v2.0.0 announcement gate at item 6 above is unaffected/still open).
+
+---
+
 ## Reconcile checklist (v2.0.0) — gated on the sign-off above
 
 1. ☑ Maintainer confirms the **WITHHELD** section (nothing from LoopOptimal should have stayed private). — Erik Ford, 2026-06-30
