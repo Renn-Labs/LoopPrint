@@ -158,7 +158,7 @@ Lint entrypoints (resolve from binding or skill `scripts/`):
 |----------|---------|
 | `loop-design.md` | Archetype choice, rationale, re-Frame cadence |
 | `loop-spec.yaml` (+ LoopPrint package) | Runnable loop blueprint when applicable |
-| `reject.md` (if REJECT) | Reason + honest alternative (one-shot, human-gated, LoopPrint-only) |
+| `reject.md` (if REJECT) | Reason + honest alternative (single-pass, human-gated, LoopPrint-only) |
 | `loopprint-lint.txt` | Per-spec lint transcript |
 
 ### GATE → Stage 3 (or STOP on REJECT)

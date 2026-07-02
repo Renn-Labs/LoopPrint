@@ -1,6 +1,6 @@
 ---
 name: looptimal
-description: "Looptimal — turns an objective into a delivered, VERIFIED OUTCOME by designing, war-gaming, and running the right loop. Use on 'looptimal', '/looptimal', 'run an outcome loop', 'orchestrate this objective to done', 'plan and ship this goal', or any non-trivial objective that needs a sealed acceptance suite, the right loop archetype, and independent verification before you call it done. ALSO handles loop-design wizard requests ('design a loop', 'build a loop', 'new loop', 'loop wizard', or a vague recurring task to automate) via the 'design' fast-path (Stage 2 only, no outcome orchestration). Runs an 8-stage pipeline: 0 Frame (hash-pinned SEALED acceptance suite) → 1 Analyze (Capability Manifest) → 2 Design-loop (wizard: Task / Recurring / Supervised / Persistent-ratchet / Orchestration, or REJECT) → 3 Plan → 4 Simulate (roll forward N steps, pre-mortem, harden) → [human GO] → 5 Execute (domain-expert sub-agents, maker ≠ checker) → 6 Verify-outcome (separate checker re-runs the SEALED suite vs live state) → 7 Persist. Fast-path hints: say 'design' or 'loop wizard' for Stage 2 blueprint only; 'skip wizard' to bypass the interview in Stage 2; 'skip simulate' to jump to Plan after Design-loop with explicit risk callout; 'fast path' for Frame + Design-loop + Plan then stop. If install looks broken — skill won't trigger, a script errors, profile won't resolve — run 'looptimal doctor' via scripts/looptimal-doctor.py."
+description: "Looptimal — turns an objective into a delivered, VERIFIED OUTCOME by designing, war-gaming, and running the right loop. Use on 'looptimal', '/looptimal', 'run an outcome loop', 'orchestrate this objective to done', 'plan and ship this goal', or any non-trivial objective that needs a sealed acceptance suite, the right loop archetype, and independent verification before you call it done. ALSO handles loop-design wizard requests ('design a loop', 'build a loop', 'new loop', 'loop wizard', or a vague recurring task to automate) via the 'design' fast-path (Stage 2 only, no outcome orchestration). For a single, non-recurring deliverable you still want proven — not trivial, just not a loop — it degrades to 'single-pass' mode: Frame → (Analyze if multi-domain) → light pre-mortem → Execute → Verify-outcome → Persist, skipping Design-loop/Plan/full Simulate. When the objective's shape is ambiguous, asks one upfront mode-fork question (single-pass / recurring system / just a blueprint) before any Frame work starts. Runs an 8-stage pipeline: 0 Frame (hash-pinned SEALED acceptance suite) → 1 Analyze (Capability Manifest) → 2 Design-loop (wizard: Task / Recurring / Supervised / Persistent-ratchet / Orchestration, or REJECT) → 3 Plan → 4 Simulate (roll forward N steps, pre-mortem, harden) → [human GO] → 5 Execute (domain-expert sub-agents, maker ≠ checker) → 6 Verify-outcome (separate checker re-runs the SEALED suite vs live state) → 7 Persist. Fast-path hints: say 'design' or 'loop wizard' for Stage 2 blueprint only; 'single-pass' for one verified pass with no loop; 'skip wizard' to bypass the interview in Stage 2; 'skip simulate' to jump to Plan after Design-loop with explicit risk callout; 'fast path' for Frame + Design-loop + Plan then stop. If install looks broken — skill won't trigger, a script errors, profile won't resolve — run 'looptimal doctor' via scripts/looptimal-doctor.py."
 license: MIT
 ---
 
@@ -16,6 +16,7 @@ The loop-design wizard (formerly the standalone LoopPrint) is embedded as Stage 
 - Multi-domain work needing a Capability Manifest, consensus plan, and maker ≠ checker at the outcome altitude.
 - Recurring, supervised, ratchet, or orchestration patterns — after Design-loop confirms this is actually a loop.
 - You want Simulate to war-game the plan before any autonomous execution.
+- A single, non-trivial objective you want delivered once and proven against live state, with none of the recurring-loop scaffolding — single-pass mode (see the mode fork below).
 
 ## When to use the design fast-path
 - "design a loop", "build a loop", "new loop", "loop wizard", or a vague recurring task to automate.
@@ -23,7 +24,7 @@ The loop-design wizard (formerly the standalone LoopPrint) is embedded as Stage 
 - Jumps directly to Stage 2 (Decision Gate → wizard → artifact generation) and stops.
 
 ## When NOT to use
-- A one-shot answer, quick edit, or conversational question → just do it well once.
+- A **trivial** one-shot answer, quick edit, or conversational question → just do it well once, no tool needed. (A *substantive* one-shot objective you still want proven — not trivial, just not recurring — is single-pass mode below, not a reason to skip Looptimal entirely.)
 - Analysis with no delivery obligation → answer directly or use esat.
 - Irreversible, judgment-heavy actions with no human willing to hold the GO gate → recommend a human-gated process.
 - Meta-loops ("run Looptimal to verify Looptimal", "auto-merge when Looptimal says GREEN") → Design-loop must REJECT.
@@ -31,15 +32,30 @@ The loop-design wizard (formerly the standalone LoopPrint) is embedded as Stage 
 
 ## Operating rules (read first)
 - This is a **skill**, not a persona or mode. Open with **one** activation line, then do the work.
-- **Checkpoint-gated**: Frame → Analyze → Design-loop → Plan → Simulate each stop for brief status. Execute never starts without explicit human GO after Simulate.
+- **Checkpoint-gated**: Frame → Analyze → Design-loop → Plan → Simulate each stop for brief status. Execute never starts without explicit human GO after Simulate — or, in single-pass mode, after the light pre-mortem that substitutes for the Analyze/Design-loop/Plan/Simulate checkpoints (see the mode fork below).
 - **Never auto-run irreversibles**: prod deploys, sends, payments, credential rotation, data deletion — pre-action human gates only.
 - **Harness-decoupled**: resolve bindings from `./.looptimal/profile.yaml` → `~/.looptimal/profile.yaml` → `scripts/looptimal-detect.py` → generic defaults. Contract: [`references/agent-foundry.md`](references/agent-foundry.md).
 
 **Activation line examples:**
 - Full pipeline: *"Looptimal — framing this objective into a sealed outcome loop."*
 - Design fast-path: *"Looptimal — blueprinting this loop."*
-- **Invoked bare** (no objective): ask exactly one question — *"What outcome should be true when we're done?"* — then Stage 0. For design-only bare invocation: *"What's the recurring task you want to blueprint?"* — then Stage 2.
-- **Objective already given**: acknowledge in one line and enter Stage 0 (full) or Stage 2 (design).
+- Single-pass: *"Looptimal — one verified pass on this, no loop."*
+- **Invoked bare** (no objective): ask exactly one question — *"What outcome should be true when we're done?"* — then the mode fork below.
+- **Objective already given**: acknowledge in one line, then the mode fork below.
+
+### The mode fork (before Frame — ask once, cheaply)
+Looptimal's loop-worthiness judgment is the Decision Gate (Step 1 of the wizard, below) — but today that only fires deep in Stage 2, after Frame and Analyze have already run. Decide the shape **before** any of that work starts instead:
+
+- **Phrasing already unambiguous — skip the question:**
+  - Design-fast-path trigger words ("design a loop", "build a loop", "blueprint", "loop wizard") → Stage 2 directly.
+  - Explicit one-shot language ("one-shot", "just do X once", "no loop needed", "single pass") → single-pass directly.
+  - Explicit recurrence/cadence language ("nightly", "every PR", "keep this fresh", "ongoing") → full pipeline directly.
+- **Otherwise — ask one structured, three-option question before touching Stage 0:**
+  1. *Get it done once, proven* — a single verified outcome, no recurring loop → **single-pass**.
+  2. *Build a loop* — either **bounded** (iterate until a gate, then stop — bug fixes, spec conformance) or **recurring** (runs on a schedule/trigger indefinitely) → full pipeline (Stage 0 → 1 → 2; the Decision Gate picks the archetype — Task / Recurring / Supervised / Persistent-ratchet / Orchestration — exactly as today).
+  3. *Just generate a loop blueprint* → design fast-path (Stage 2 only).
+
+This surfaces the same loop-worthiness call the Decision Gate already makes as the user's own judgment, upfront and cheap, instead of only reachable after Analyze, Design-loop, and Plan have already been spent on the wrong shape (Frame runs regardless of the chosen mode, so it's never wasted). If Stage 0/1 evidence later contradicts the chosen mode — a "single-pass" objective turns out to clearly recur or need iteration until a gate, or a "recurring system" doesn't survive the Decision Gate — say so plainly and let the user redirect. Never silently override their choice; never silently comply with a mode the evidence doesn't support.
 
 ### Resolve the binding (Stage 0 preamble)
 ```bash
@@ -157,7 +173,7 @@ Say **"skip wizard"** or **"direct run"** to bypass Steps 1–4's interview: rea
 - **Sealed verifier inputs** — the maker cannot edit the acceptance suite, oracle configs, or holdout credentials after Frame.
 - **Maker ≠ checker** — at every altitude: iteration gates *and* the final outcome verifier. No self-grading.
 - **Every criterion binds a sealed domain outcome-oracle** — tests, live API probes, read-only metric pulls, published-content hashes, compliance receipts — not agent prose.
-- **War-game before GO** — Simulate is mandatory on the default path.
+- **War-game before GO** — Simulate is mandatory on the default path (single-pass substitutes a light pre-mortem; see Degrade rules).
 - **Resumable / idempotent execution** — durable state after every meaningful step; safe retry and rollback.
 - **External write-back receipts** — claims of "deployed", "published", "rotated" must be re-pulled from the external system by the checker.
 - **Partial completion is failure** — outcome criteria quantify over the full scope unless the sealed suite explicitly scopes down.
@@ -171,11 +187,12 @@ Say **"skip wizard"** or **"direct run"** to bypass Steps 1–4's interview: rea
 ---
 
 ## Degrade / fast-path rules
+- **"single-pass"** (or chosen via the mode fork above) — the Decision Gate's own honest alternative ("one high-quality pass") made directly selectable, not just the fallback when Stage 2 fails: Frame (sealed suite — the maker ≠ checker guarantee matters just as much for one outcome) → Analyze only if the objective is genuinely multi-domain, else skip → a **light pre-mortem** (the 3-scenario "this will fail because…" check, one line of prevention each — not full N-step Simulate, since there's no loop to roll forward) → human GO → Execute (one pass; no archetype, no iteration loop) → Verify-outcome (Stage 6, unchanged — still a separate checker, still live state) → Persist. Skips Design-loop archetype selection and Plan's consensus task graph entirely.
 - **"design"** / loop wizard fast-path — enter Stage 2 wizard; stop after artifact generation. No outcome orchestration.
 - **"skip simulate"** — allowed after Design-loop + Plan; print a one-paragraph risk callout (top failure modes Simulate would have caught); require explicit user confirmation before GO.
 - **"fast path"** — Frame + Design-loop + Plan, then stop with a ready-to-run package. No autonomous Execute.
 - **"analysis-only"** — stop after Stage 1 with Capability Manifest + esat output.
-- Degrade never bypasses: sealed suite, maker ≠ checker, irreversible human gates, or Stage 6 live-state verifier.
+- Degrade never bypasses: sealed suite, maker ≠ checker, irreversible human gates, or Stage 6 live-state verifier (single-pass's light pre-mortem is a legitimate substitute for full Simulate — it is not a bypass of the GO gate itself).
 
 ---
 
@@ -207,7 +224,7 @@ Apply safe `fix:` lines yourself; for anything that re-clones, edits user config
 
 ## Hard guards (always)
 - No criterion the maker can satisfy by self-assessment. Bind to an external oracle or stop.
-- No Execute without human GO after Simulate (or documented degrade acceptance).
+- No Execute without human GO after Simulate, or the light pre-mortem in single-pass mode (or other documented degrade acceptance).
 - No irreversible action without a pre-action human gate and blast-radius disclosure.
 - No meta-loop: the orchestrator must not grade its own orchestration as the outcome.
 - No "done" without Stage 6 Verify-outcome GREEN on live state — loop self-reported GREEN is informational only.
@@ -222,7 +239,7 @@ Apply safe `fix:` lines yourself; for anything that re-clones, edits user config
 - Meta-loop: automating approval of Looptimal's own output, or any self-referential verifier.
 - Judgment-only goals with no machine- or oracle-checkable outcome ("make it feel premium").
 - Symptom ratchet with no behavioral anchor (coverage %, lint score, complexity metric alone).
-- When honest alternative is better: direct execution, human-gated checklist, or design fast-path without outcome orchestration.
+- When honest alternative is better: direct execution, **single-pass** (Frame + Verify-outcome without loop scaffolding — see Degrade rules), human-gated checklist, or design fast-path without outcome orchestration.
 
 ## Common failure modes (stay honest)
 - **Reward-hacking** — suite passes by narrowing scope, quarantining tests, stubbing externals. Simulate + outcome oracles are the fix; if they are weak, say FAIL early.

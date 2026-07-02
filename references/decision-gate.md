@@ -40,7 +40,7 @@ Answer fast. Any "no" in 1–4 is a hard stop; the rest shape the design.
   archetype whose *verifier* and *stop* shape actually fit. Note any unchecked safety items as required artifacts.
 - **Fail (any of 1–4 no):** the gate **rejects** — recommend the honest alternative and stop. This is the most
   valuable thing Looptimal does; routing never overrides it.
-  - Not recurring / retries costly → **one high-quality pass**.
+  - Not recurring / retries costly → **one high-quality pass** (Looptimal's `single-pass` mode — see `SKILL.md`'s Degrade rules — carries the sealed suite + independent Stage-6 verify through without loop scaffolding, rather than an unverified single attempt).
   - No objective gate of *any* shape (not a test, not a ratchet baseline, not a rubric + independent critics, not
     even a human checkpoint) → **human-reviewed task**, not an autonomous loop.
   - Irreversible + judgment-heavy (prod deploy, auth, payments) → **human-gated process**.
