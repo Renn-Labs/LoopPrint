@@ -5,6 +5,81 @@ mission — this is a strategic planning artifact, produced and reviewed like an
 it each time a horizon empties or the market signal below goes stale (external framework/tooling facts
 move fast; re-check before trusting a citation more than a few months old).
 
+---
+
+## Status reconciliation (2026-07-01)
+
+Verified directly against `main` (code and tests read, not inferred from this doc's own prose) — not
+trusted blindly. This block is purely additive: nothing below was deleted or rewritten. Where an
+item's original prose makes a present-tense claim the current repo state now contradicts, a bracketed
+`[Correction 2026-07-01: …]` is appended inline right after that sentence, so the original reasoning
+stays legible as a historical record rather than being silently edited away.
+
+**Shipped on `main` (12 of 14 — items 1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14):**
+
+- **1 — Zero-clone quickstart.** `pyproject.toml` exists with a working `[project.scripts]` block
+  (`looptimal-doctor`, `looptimal-lint`, `verify-outcome`, etc.) delegating to `scripts/*.py`.
+- **2 — Demo asset.** `assets/demo.gif` and `assets/demo.cast` both exist.
+- **3 — README overhaul.** The first screen has the zero-clone proof block ("Prove it in under a
+  minute"), three badges (CI, license, GitHub stars), and the three sourced numbers (SpecBench
+  arXiv:2605.21384, ImpossibleBench arXiv:2510.20270, Cursor's SWE-bench Pro study) in place of the
+  old first-principles-only argument.
+- **5 — SSH-signed release tags.** Cryptographically confirmed, not just documented: `git -c
+  gpg.ssh.allowedSignersFile=allowed_signers.example tag -v v2.0.0` returns `Good "git" signature for
+  …`. `RELEASE.md` documents the process and `allowed_signers.example` ships at the repo root.
+- **7 — HMAC-keyed hash-pin.** `scripts/_common.py::canonical_contract_hash()` now accepts optional
+  `key` (HMAC-SHA256) and `sealed_dir` (full sealed-tree materials-folding) parameters, and both are
+  wired into the real verification paths in `verify-outcome.py` and `looptimal-lint.py` (opt-in via a
+  configured framer key; the old unkeyed self-digest stays the default when no key is set, for
+  backward compatibility). **Confirmed absent at the `v2.0.0` tag commit** via `git show
+  <tag-commit>:scripts/_common.py` (no `hmac`/`sealed_dir_materials` hits) — it landed in a later
+  commit (`20a32d2`, after the tag). Not yet in any release tag.
+- **8 — Checker-only visibility tier.** `templates/contract.yaml` has
+  `criteria[].visibility: maker-visible | checker-only` (default `maker-visible`);
+  `scripts/looptimal-lint.py` enforces it and emits the soft "zero checker-only criteria" advisory
+  for `sensitivity: high` missions. (`references/schema.md` documents `loop-spec.yaml` /
+  `campaign-spec.yaml` / `verifier-library.yaml` only — it never covered `contract.yaml` fields even
+  before this shipped, so its silence on `visibility` isn't a documentation regression.)
+- **9 — Dagger Container-Use isolation recipe.** `examples/dagger-isolation/README.md` exists and
+  documents the pattern with an illustrative `profile.yaml` snippet. **Caveat, self-disclosed in the
+  file's own "Status" section:** "documentation of a pattern, not a shipped, tested integration —
+  Dagger is never imported by any `scripts/*.py` file, and no CI job in this repo exercises
+  Container-Use." Counted as shipped (the example/profile the item asked for exists) but it is docs,
+  not a tested integration — flagging this so the distinction isn't lost.
+- **10 — Hard-vs-soft gate labeling.** `templates/verifier-library.yaml` has `gate_type: hard | soft`
+  on every recipe, cross-referenced from `looptimal-lint.py` and `contract.yaml`.
+- **11 — Structured critic verdicts.** `examples/critic-panel/critic-1.sh` now outputs
+  `{"score": 90, "reason": "..."}` (structured JSON), not a bare integer.
+- **12 — Judge-calibration recipe.** `tests/test_judge_calibration.py` and
+  `examples/critic-panel/calibration/check_calibration.sh` both exist.
+- **13 — Cross-Provider Judge Quorum oracle.** `references/oracle-library.md` pattern #14 is live.
+- **14 — Sealed Tool-Trajectory Match oracle.** `references/oracle-library.md` pattern #15 is live,
+  backed by `templates/tool_trajectory_check.py`. The library now totals 15 patterns (was 13).
+
+**Still open (2 of 14 — items 4, 6) — do not treat as shipped:**
+
+- **4 — Independent, CI-gated skill-audit badge.** **Not wired.** `.github/workflows/ci.yml` has no
+  audit-related job (only `test`, `runner-smoke`, `shellcheck`, `lint-specs`,
+  `version-consistency`, `no-network-imports`); `README.md` still shows only 3 badges (CI, license,
+  stars) — no audit badge. `CONTRIBUTING.md` is explicit that the closest existing thing
+  (`scripts/check-no-network-imports.py`) is "a self-authored regression guard, not an independent
+  third-party audit — we'd welcome a PR wiring in a genuinely independent skill-auditing tool if a
+  stable one turns up." Genuinely open.
+- **6 — Marketplace/awesome-list listings.** No evidence of submission to `awesome-claude-code`,
+  `awesome-claude-skills`, or `anthropics/claude-plugins-official` anywhere in the repo or git log.
+  The only related hits are `CHANGELOG.md` references to the pre-existing self-hosted `renn-labs`
+  marketplace, which is the status quo the item itself describes as insufficient, not a new listing.
+  Launch-phase work, not yet executed, as expected.
+
+**Release-tag gap.** None of the shipped code/doc work above (items 1, 2, 3, 7-14) is reflected in a
+git release tag yet — `v2.0.0` is the latest tag and predates all of it (directly confirmed for item
+7; the rest ship after the same tag by the same evidence — a 2026-06-30-dated roadmap describing them
+as still-to-do, now present on `main`). Item 5 is the one exception: SSH tag signing is a property of
+the `v2.0.0` tag itself, already verified above. Closing the rest of this gap is the job of a planned
+**v2.1.0** release — a separate task, not in scope here.
+
+---
+
 ## How this was built
 
 Two passes, kept separate on purpose (the project's own maker-≠-checker instinct applied to itself):
@@ -50,7 +125,9 @@ say so explicitly rather than padding the count.
 
 ### 1. Zero-clone quickstart (`pyproject.toml` + console-scripts + `uvx --from git+...`)
 Re-scopes open issue #9 ("packaged CLI") into a much smaller first slice. No `pyproject.toml` exists in
-the repo today, so this is unscoped work, not a restatement of the issue. A `[project.scripts]` block
+the repo today, so this is unscoped work, not a restatement of the issue. [Correction 2026-07-01:
+`pyproject.toml` now exists on main, with a working `[project.scripts]` block wired to `looptimal_cli`
+(which delegates to `scripts/*.py`) — see `pyproject.toml`.] A `[project.scripts]` block
 wired to the existing `scripts/looptimal-doctor.py` etc. needs no PyPI account, no name-squatting risk,
 no trusted-publishing setup — but it gives a first-time visitor one copy-pasteable command
 (`uvx --from git+https://github.com/Renn-Labs/Looptimal looptimal-doctor`) that runs the tool without a
@@ -71,9 +148,12 @@ technical audience rewards over sales language. Use `agg` (the current asciinema
 Three changes to one file, sequenced together because they all touch the first screen: (a) move a
 zero-clone proof block (once #1 exists) above the philosophy/pipeline table — onboarding research is
 specific that conversion tracks literal seconds-to-first-proof, and today nothing zero-clone is
-documented at all; (b) add three *objectively true, re-checkable* badges (CI status, license, star
-count) — the repo already runs a full Ubuntu/macOS/Windows CI matrix with shellcheck and a
-version-consistency gate, and currently shows zero badges for any of it; (c) replace the first-principles
+documented at all [Correction 2026-07-01: README.md now leads with a "Prove it in under a minute"
+zero-clone proof block above the pipeline table — see README.md.]; (b) add three *objectively true,
+re-checkable* badges (CI status, license, star count) — the repo already runs a full
+Ubuntu/macOS/Windows CI matrix with shellcheck and a version-consistency gate, and currently shows
+zero badges for any of it [Correction 2026-07-01: README.md now shows three badges — CI, license,
+GitHub stars — at the top of the file.]; (c) replace the first-principles
 argument for maker ≠ checker with three sourced numbers now available: SpecBench's finding that the
 visible-vs-holdout-test pass-rate gap grows ~28 points per 10x increase in code size (arXiv:2605.21384),
 ImpossibleBench's finding that hiding tests drops cheating from up to 76% to near zero (arXiv:2510.20270),
@@ -97,7 +177,10 @@ tool, not a paid tier, so the badge doesn't become a budget dependency of the re
 ### 5. Sign release tags with SSH
 Every other hardening item here protects a *generated* loop's sealed contract or a future packaged CLI —
 today the only install path is git clone or manual copy, and nothing lets a user verify a checkout
-actually came from Renn Labs unmodified. GitHub verifies SSH-signed tags/commits natively (Git 2.34+,
+actually came from Renn Labs unmodified. [Correction 2026-07-01: the `v2.0.0` tag is now SSH-signed
+and independently verifies — `git tag -v v2.0.0` (with `allowed_signers.example` configured) returns
+`Good "git" signature for …` — see `RELEASE.md` and `allowed_signers.example`.] GitHub verifies
+SSH-signed tags/commits natively (Git 2.34+,
 no keyserver, reuses an existing push key) and marks them "Verified." A few `git config` lines and
 `git tag -s` on the next tag — no new dependency. Document this in `RELEASE.md` as *release hygiene*,
 distinct from the sealed-contract hash-pin work in Horizon 2 — different guarantee, don't conflate them.
@@ -139,7 +222,10 @@ this closes it, doesn't eliminate all trust assumptions. *Impact 5 / Effort 3.*
 
 ### 8. Checker-only ("holdout") visibility tier in the acceptance-suite schema
 `references/simulate.md` already names a "holdout oracle" as Stage-4 red-team advice — but it's prose,
-not schema. `contract.yaml` has no visibility field, so nothing enforces it. This is the single
+not schema. `contract.yaml` has no visibility field, so nothing enforces it. [Correction 2026-07-01:
+`templates/contract.yaml` now has `criteria[].visibility: maker-visible | checker-only` (default
+`maker-visible`), enforced by `scripts/looptimal-lint.py` including the soft zero-checker-only-criteria
+advisory for `sensitivity: high` missions described two sentences below.] This is the single
 highest-value gap 2026 reward-hacking research points at directly: SpecBench (arXiv:2605.21384) defines
 reward hacking as exactly the visible-vs-holdout pass-rate gap; ImpossibleBench (arXiv:2510.20270) found
 hiding tests is what actually collapses cheating, not just mutating them. Add
@@ -175,7 +261,9 @@ as a subprocess the sealed suite shells out to, never a Python import — consis
 
 ### 11. Structured `{score, reason}` critic verdicts
 Confirmed directly: `examples/critic-panel/critic-1.sh` does `echo 90` — a bare integer, explicitly
-commented "Output integer only," with zero rationale. Every major eval framework checked (promptfoo's
+commented "Output integer only," with zero rationale. [Correction 2026-07-01:
+`examples/critic-panel/critic-1.sh` now outputs structured JSON —
+`{"score": 90, "reason": "..."}` — not a bare integer.] Every major eval framework checked (promptfoo's
 `llm-rubric`, DeepEval's G-Eval) returns a reason alongside the score specifically so boundary failures
 are debuggable — the verifier-library's own existing caveat ("re-run on boundary cases") is
 undercut without one. Extend the critic stub contract to `{score, reason}` and have `verify.sh` JSON-escape
@@ -184,7 +272,8 @@ free-text model output with quotes/newlines will otherwise corrupt `critics.json
 
 ### 12. Judge-calibration recipe
 Both the `llm-rubric-judge` and critic-panel recipes carry a "judge inconsistency is real" caveat today
-with no mechanism to check it. Anthropic's own eval guidance treats calibrating a judge against
+with no mechanism to check it. [Correction 2026-07-01: a calibration mechanism now exists —
+`examples/critic-panel/calibration/check_calibration.sh` and `tests/test_judge_calibration.py`.] Anthropic's own eval guidance treats calibrating a judge against
 human-labeled examples as load-bearing, not optional. A bounded, stdlib-only addition: a template of
 5-10 `(artifact, expected-verdict)` pairs plus a small harness that runs a critic script against each and
 requires a minimum agreement rate before the loop trusts it. Document it honestly as "catches a broken or
@@ -195,7 +284,9 @@ example set is a smoke test, not proof of scoring accuracy. *Impact 4 / Effort 3
 `references/oracle-library.md` has 13 sealed, lint-bindable patterns; none is a first-class binding
 target for an open-ended/subjective criterion (a written artifact, a design doc, a research brief) even
 though the mechanism to seal one — `rubric_sha`, judge roster, `quorum_k`, threshold — already exists in
-`verifier-library.yaml`'s critic-panel recipe and is proven end-to-end in `examples/critic-panel/`. This
+`verifier-library.yaml`'s critic-panel recipe and is proven end-to-end in `examples/critic-panel/`.
+[Correction 2026-07-01: `references/oracle-library.md` now has pattern #14 "Cross-Provider Judge
+Quorum" — this gap is closed.] This
 is a promotion, not new infrastructure: give it a number, the same sealing discipline as the other 12
 (rubric/roster/quorum frozen before Execute), and an explicit lint rule that the sealed judge roster may
 not include any provider matching the maker's provider. *Impact 4 / Effort 2.*
@@ -203,6 +294,9 @@ not include any provider matching the maker's provider. *Impact 4 / Effort 2.*
 ### 14. New oracle pattern: #15 "Sealed Tool-Trajectory Match"
 All 13 existing oracle patterns verify final state or output; none verifies the Execute-stage agent's
 *process* — which tools it called, in what order, whether it stayed inside an allowed/forbidden list.
+[Correction 2026-07-01: `references/oracle-library.md` now has pattern #15 "Sealed Tool-Trajectory
+Match", implemented via `templates/tool_trajectory_check.py` — this gap is closed. The library now
+totals 15 patterns.]
 A maker that used a forbidden write-access tool to fabricate its own passing state is a real, currently
 unaddressed failure mode. LangChain's `agentevals` ships exactly this (`create_trajectory_match_evaluator`,
 strict/unordered/subset modes) as a deterministic, LLM-free evaluator category, distinct from
